@@ -1,65 +1,185 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { FileText, Home, PlayCircle } from "lucide-react";
+import { supabase } from "../utils/supabase";
+
+const navItems = [
+	{ label: "홈", href: "/", icon: Home, active: true },
+	{ label: "영상", href: "/video", icon: PlayCircle, active: false },
+	{ label: "자료", href: "/material", icon: FileText, active: false },
+];
+
+type AnnouncementItem = {
+	id: number;
+	content: string;
+	created_at: string;
+};
+
+type MaterialPreviewItem = {
+	id: number;
+	title: string;
+	category: "문학" | "비문학";
+	created_at: string;
+};
+
+function toKoreanDate(value: string) {
+	return new Date(value).toLocaleDateString("ko-KR", {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+	});
+}
+
+export default function HomePage() {
+	const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+	const [latestMaterials, setLatestMaterials] = useState<MaterialPreviewItem[]>([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [errorMessage, setErrorMessage] = useState("");
+
+	useEffect(() => {
+		let isMounted = true;
+
+		const fetchHomeData = async () => {
+			setIsLoading(true);
+			setErrorMessage("");
+
+			const [announcementResult, materialResult] = await Promise.all([
+				supabase
+					.from("announcements")
+					.select("id, content, created_at")
+					.order("created_at", { ascending: false })
+					.limit(3),
+				supabase
+					.from("materials")
+					.select("id, title, category, created_at")
+					.order("created_at", { ascending: false })
+					.limit(2),
+			]);
+
+			if (!isMounted) {
+				return;
+			}
+
+			if (announcementResult.error || materialResult.error) {
+				setErrorMessage("홈 데이터를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.");
+				setAnnouncements([]);
+				setLatestMaterials([]);
+				setIsLoading(false);
+				return;
+			}
+
+			setAnnouncements((announcementResult.data ?? []) as AnnouncementItem[]);
+			setLatestMaterials((materialResult.data ?? []) as MaterialPreviewItem[]);
+			setIsLoading(false);
+		};
+
+		fetchHomeData();
+
+		return () => {
+			isMounted = false;
+		};
+	}, []);
+
+	return (
+		<main className="relative min-h-screen bg-zinc-100">
+			<div className="mx-auto w-full max-w-sm px-5 pb-28 pt-8">
+				<section className="rounded-3xl border border-zinc-200 bg-white/85 p-7 text-center shadow-[0_18px_45px_-25px_rgba(0,0,0,0.35)] backdrop-blur-sm">
+					<h1 className="text-2xl font-bold tracking-tight text-zinc-800">
+						강의실에 오신 것을 환영합니다!
+					</h1>
+					<p className="mt-3 text-sm leading-relaxed text-zinc-500">
+						오늘도 즐거운 배움이 가득한 하루를 시작해 보세요.
+					</p>
+				</section>
+
+				<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+					<h2 className="text-base font-semibold text-zinc-900">최신 공지사항</h2>
+
+					{isLoading ? (
+						<p className="mt-3 text-sm text-zinc-600">데이터를 불러오는 중입니다...</p>
+					) : null}
+
+					{!isLoading && errorMessage ? (
+						<p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+							{errorMessage}
+						</p>
+					) : null}
+
+					{!isLoading && !errorMessage && announcements.length === 0 ? (
+						<p className="mt-3 text-sm text-zinc-500">등록된 공지사항이 없습니다.</p>
+					) : null}
+
+					{!isLoading && !errorMessage && announcements.length > 0 ? (
+						<ul className="mt-3 space-y-2">
+							{announcements.map((announcement) => (
+								<li key={announcement.id} className="rounded-2xl bg-zinc-100 px-3 py-2.5">
+									<p className="text-sm leading-relaxed text-zinc-800">{announcement.content}</p>
+									<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(announcement.created_at)}</p>
+								</li>
+							))}
+						</ul>
+					) : null}
+				</section>
+
+				<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+					<div className="flex items-center justify-between">
+						<h2 className="text-base font-semibold text-zinc-900">최신 학습 자료</h2>
+						<Link href="/material" className="text-xs font-semibold text-zinc-600 hover:text-zinc-900">
+							전체보기
+						</Link>
+					</div>
+
+					{isLoading ? (
+						<p className="mt-3 text-sm text-zinc-600">데이터를 불러오는 중입니다...</p>
+					) : null}
+
+					{!isLoading && !errorMessage && latestMaterials.length === 0 ? (
+						<p className="mt-3 text-sm text-zinc-500">등록된 최신 자료가 없습니다.</p>
+					) : null}
+
+					{!isLoading && !errorMessage && latestMaterials.length > 0 ? (
+						<ul className="mt-3 space-y-2">
+							{latestMaterials.map((material) => (
+								<li
+									key={material.id}
+									className="flex items-center justify-between rounded-2xl bg-zinc-100 px-3 py-2.5"
+								>
+									<div>
+										<p className="text-sm font-medium text-zinc-800">{material.title}</p>
+										<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+									</div>
+									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+										{material.category}
+									</span>
+								</li>
+							))}
+						</ul>
+					) : null}
+				</section>
+			</div>
+
+			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
+				<ul className="mx-auto grid w-full max-w-sm grid-cols-3 gap-2">
+					{navItems.map(({ label, href, icon: Icon, active }) => (
+						<li key={label}>
+							<Link
+								href={href}
+								className={`flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium transition ${
+									active
+										? "bg-zinc-900 text-white shadow-sm"
+										: "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
+								}`}
+								aria-current={active ? "page" : undefined}
+							>
+								<Icon className="mb-1 h-5 w-5" strokeWidth={2.1} />
+								<span>{label}</span>
+							</Link>
+						</li>
+					))}
+				</ul>
+			</nav>
+		</main>
+	);
 }
