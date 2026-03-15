@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -113,19 +114,22 @@ export default function MaterialPage() {
 
 					{!isLoading && !errorMessage
 						? materials.map((material) => (
-							<article
+							<Link
 								key={material.id}
-								className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]"
+								href={`/material/${material.id}`}
+								className="block rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
 							>
-								<div className="flex items-start justify-between gap-3">
-									<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
-									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
-										{material.category}
-									</span>
-								</div>
-								<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
-								<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">{material.content}</p>
-							</article>
+								<article>
+									<div className="flex items-start justify-between gap-3">
+										<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
+										<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+											{material.category}
+										</span>
+									</div>
+									<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+									<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">{material.content}</p>
+								</article>
+							</Link>
 						))
 						: null}
 				</section>
