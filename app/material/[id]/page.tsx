@@ -14,6 +14,11 @@ type MaterialDetail = {
 	created_at: string;
 };
 
+type MaterialSegment = {
+	originalText: string;
+	thinkingText: string;
+};
+
 const THINKING_KEYWORD = "사고 과정:";
 
 function toKoreanDate(value: string) {
@@ -24,20 +29,45 @@ function toKoreanDate(value: string) {
 	});
 }
 
-function splitMaterialContent(content: string) {
-	const keywordIndex = content.indexOf(THINKING_KEYWORD);
+function splitMaterialContent(content: string): MaterialSegment[] {
+	const normalized = content.trim();
 
-	if (keywordIndex === -1) {
-		return {
-			originalText: content.trim(),
-			thinkingText: "",
-		};
+	if (!normalized) {
+		return [];
 	}
 
-	return {
-		originalText: content.slice(0, keywordIndex).trim(),
-		thinkingText: content.slice(keywordIndex + THINKING_KEYWORD.length).trim(),
-	};
+	// Repeated pattern: [원문] 사고 과정: [해설] [원문] 사고 과정: [해설] ...
+	const pattern = /([\s\S]*?)사고 과정:\s*([\s\S]*?)(?=(?:\n\s*\n)?[\s\S]*?사고 과정:|$)/g;
+	const segments: MaterialSegment[] = [];
+	let cursor = 0;
+	let match: RegExpExecArray | null;
+
+	while ((match = pattern.exec(normalized)) !== null) {
+		const fullMatch = match[0];
+		const originalText = (match[1] ?? "").trim();
+		const thinkingText = (match[2] ?? "").trim();
+
+		if (originalText || thinkingText) {
+			segments.push({ originalText, thinkingText });
+		}
+
+		cursor = pattern.lastIndex;
+
+		if (!fullMatch) {
+			break;
+		}
+	}
+
+	if (segments.length === 0) {
+		return [{ originalText: normalized, thinkingText: "" }];
+	}
+
+	const remaining = normalized.slice(cursor).trim();
+	if (remaining) {
+		segments.push({ originalText: remaining, thinkingText: "" });
+	}
+
+	return segments;
 }
 
 function MarkdownBlock({ text }: { text: string }) {
@@ -125,10 +155,7 @@ export default function MaterialDetailPage() {
 		};
 	}, [materialId]);
 
-	const parsedContent = useMemo(
-		() => splitMaterialContent(material?.content ?? ""),
-		[material?.content],
-	);
+	const parsedSegments = useMemo(() => splitMaterialContent(material?.content ?? ""), [material?.content]);
 
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-10 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
@@ -169,20 +196,26 @@ export default function MaterialDetailPage() {
 						</header>
 
 						<section className="mt-6 space-y-4 text-sm text-zinc-800 sm:text-base">
-							<div className="bg-gray-100 rounded-lg p-4">
-								<h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-600">원문</h2>
-								<MarkdownBlock text={parsedContent.originalText || material.content} />
-							</div>
+							{parsedSegments.map((segment, index) => (
+								<div key={`${material.id}-${index}`} className="space-y-3">
+									{segment.originalText ? (
+										<div className="bg-gray-100 rounded-lg p-4">
+											<h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-600">원문 {index + 1}</h2>
+											<MarkdownBlock text={segment.originalText} />
+										</div>
+									) : null}
 
-							{parsedContent.thinkingText ? (
-								<div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
-									<h2 className="mb-2 text-sm font-semibold text-blue-900">
-										<span aria-hidden="true" className="mr-1">💡</span>
-										사고 과정
-									</h2>
-									<MarkdownBlock text={parsedContent.thinkingText} />
+									{segment.thinkingText ? (
+										<div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
+											<h2 className="mb-2 text-sm font-semibold text-blue-900">
+												<span aria-hidden="true" className="mr-1">💡</span>
+												사고 과정 {index + 1}
+											</h2>
+											<MarkdownBlock text={segment.thinkingText} />
+										</div>
+									) : null}
 								</div>
-							) : null}
+							))}
 						</section>
 					</article>
 				) : null}
