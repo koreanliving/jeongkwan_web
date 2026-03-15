@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 import { supabase } from "../../../utils/supabase";
 
 type MaterialDetail = {
@@ -78,8 +79,6 @@ export default function MaterialDetailPage() {
 		};
 	}, [materialId]);
 
-	const chunks = (material?.content ?? "").split(/\n\s*\n/);
-
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-10 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
 			<div className="mx-auto w-full max-w-3xl">
@@ -118,43 +117,24 @@ export default function MaterialDetailPage() {
 							</h1>
 						</header>
 
-						<section className="mt-6 space-y-4 text-sm text-zinc-800 sm:text-base">
-							{chunks.map((chunk, index) => {
-								const trimmedChunk = chunk.trim();
-								if (!trimmedChunk) {
-									return null;
-								}
-
-								const match = trimmedChunk.match(/(사고\s*과정\s*:)/);
-
-								if (match && typeof match.index === "number") {
-									const originalText = trimmedChunk.substring(0, match.index).trim();
-									const thinkingText = trimmedChunk.substring(match.index).trim();
-
-									return (
-										<div key={`${material.id}-${index}`}>
-											{originalText ? (
-												<div className="bg-gray-100 p-4 rounded-lg mb-2 text-gray-800 whitespace-pre-wrap leading-relaxed">
-													{originalText}
-												</div>
-											) : null}
-											<div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400 mb-6 text-gray-800 whitespace-pre-wrap leading-relaxed">
-												<span aria-hidden="true">💡 </span>
-												{thinkingText}
-											</div>
-										</div>
-									);
-								}
-
-								return (
-									<div
-										key={`${material.id}-${index}`}
-										className="bg-gray-100 p-4 rounded-lg mb-2 text-gray-800 whitespace-pre-wrap leading-relaxed"
-									>
-										{trimmedChunk}
-									</div>
-								);
-							})}
+						<section className="mt-6 text-sm text-zinc-800 sm:text-base">
+							<ReactMarkdown
+								components={{
+									blockquote: ({ children }: ComponentPropsWithoutRef<"blockquote">) => (
+										<blockquote className="bg-gray-100 p-5 rounded-xl mb-3 text-gray-800 text-lg font-bold border-l-4 border-gray-400">
+											{children}
+										</blockquote>
+									),
+									p: ({ children }: ComponentPropsWithoutRef<"p">) => (
+										<p className="bg-blue-50 p-5 rounded-xl mb-8 text-gray-700 leading-relaxed">
+											<span aria-hidden="true">💡 사고 과정 : </span>
+											{children}
+										</p>
+									),
+								}}
+							>
+								{material.content}
+							</ReactMarkdown>
 						</section>
 					</article>
 				) : null}
