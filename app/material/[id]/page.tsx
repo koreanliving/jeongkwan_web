@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ComponentPropsWithoutRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import ReactMarkdown from "react-markdown";
 import { supabase } from "../../../utils/supabase";
 
 type MaterialDetail = {
@@ -14,88 +13,12 @@ type MaterialDetail = {
 	created_at: string;
 };
 
-type MaterialSegment = {
-	originalText: string;
-	thinkingText: string;
-};
-
-const THINKING_KEYWORD = "사고 과정:";
-
 function toKoreanDate(value: string) {
 	return new Date(value).toLocaleDateString("ko-KR", {
 		year: "numeric",
 		month: "long",
 		day: "numeric",
 	});
-}
-
-function splitMaterialContent(content: string): MaterialSegment[] {
-	const normalized = content.trim();
-
-	if (!normalized) {
-		return [];
-	}
-
-	// Repeated pattern: [원문] 사고 과정: [해설] [원문] 사고 과정: [해설] ...
-	const pattern = /([\s\S]*?)사고 과정:\s*([\s\S]*?)(?=(?:\n\s*\n)?[\s\S]*?사고 과정:|$)/g;
-	const segments: MaterialSegment[] = [];
-	let cursor = 0;
-	let match: RegExpExecArray | null;
-
-	while ((match = pattern.exec(normalized)) !== null) {
-		const fullMatch = match[0];
-		const originalText = (match[1] ?? "").trim();
-		const thinkingText = (match[2] ?? "").trim();
-
-		if (originalText || thinkingText) {
-			segments.push({ originalText, thinkingText });
-		}
-
-		cursor = pattern.lastIndex;
-
-		if (!fullMatch) {
-			break;
-		}
-	}
-
-	if (segments.length === 0) {
-		return [{ originalText: normalized, thinkingText: "" }];
-	}
-
-	const remaining = normalized.slice(cursor).trim();
-	if (remaining) {
-		segments.push({ originalText: remaining, thinkingText: "" });
-	}
-
-	return segments;
-}
-
-function MarkdownBlock({ text }: { text: string }) {
-	const normalizedMarkdown = useMemo(() => text.replace(/\n/g, "  \n"), [text]);
-
-	type ParagraphProps = ComponentPropsWithoutRef<"p">;
-	type StrongProps = ComponentPropsWithoutRef<"strong">;
-	type ListProps = ComponentPropsWithoutRef<"ul">;
-	type OrderedListProps = ComponentPropsWithoutRef<"ol">;
-	type ListItemProps = ComponentPropsWithoutRef<"li">;
-	type QuoteProps = ComponentPropsWithoutRef<"blockquote">;
-
-	return (
-		<ReactMarkdown
-			components={{
-				p: ({ children }: ParagraphProps) => <p className="mb-3 leading-relaxed last:mb-0">{children}</p>,
-				strong: ({ children }: StrongProps) => <strong className="font-bold text-zinc-900">{children}</strong>,
-				ul: ({ children }: ListProps) => <ul className="mb-3 list-disc space-y-1 pl-5 last:mb-0">{children}</ul>,
-				ol: ({ children }: OrderedListProps) => <ol className="mb-3 list-decimal space-y-1 pl-5 last:mb-0">{children}</ol>,
-				li: ({ children }: ListItemProps) => <li className="leading-relaxed">{children}</li>,
-				blockquote: ({ children }: QuoteProps) => (
-					<blockquote className="my-3 border-l-4 border-zinc-300 pl-3 text-zinc-700">{children}</blockquote>
-				),
-			}}
-		>
-			{normalizedMarkdown}
-		</ReactMarkdown>
-	);
 }
 
 export default function MaterialDetailPage() {
@@ -155,7 +78,7 @@ export default function MaterialDetailPage() {
 		};
 	}, [materialId]);
 
-	const parsedSegments = useMemo(() => splitMaterialContent(material?.content ?? ""), [material?.content]);
+	const chunks = (material?.content ?? "").split(/\n\s*\n/);
 
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-10 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
@@ -196,26 +119,42 @@ export default function MaterialDetailPage() {
 						</header>
 
 						<section className="mt-6 space-y-4 text-sm text-zinc-800 sm:text-base">
-							{parsedSegments.map((segment, index) => (
-								<div key={`${material.id}-${index}`} className="space-y-3">
-									{segment.originalText ? (
-										<div className="bg-gray-100 rounded-lg p-4">
-											<h2 className="mb-2 text-xs font-semibold tracking-wide text-zinc-600">원문 {index + 1}</h2>
-											<MarkdownBlock text={segment.originalText} />
-										</div>
-									) : null}
+							{chunks.map((chunk, index) => {
+								const trimmedChunk = chunk.trim();
+								if (!trimmedChunk) {
+									return null;
+								}
 
-									{segment.thinkingText ? (
-										<div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-400">
-											<h2 className="mb-2 text-sm font-semibold text-blue-900">
-												<span aria-hidden="true" className="mr-1">💡</span>
-												사고 과정 {index + 1}
-											</h2>
-											<MarkdownBlock text={segment.thinkingText} />
+								const match = trimmedChunk.match(/(사고\s*과정\s*:)/);
+
+								if (match && typeof match.index === "number") {
+									const originalText = trimmedChunk.substring(0, match.index).trim();
+									const thinkingText = trimmedChunk.substring(match.index).trim();
+
+									return (
+										<div key={`${material.id}-${index}`}>
+											{originalText ? (
+												<div className="bg-gray-100 p-4 rounded-lg mb-2 text-gray-800 whitespace-pre-wrap leading-relaxed">
+													{originalText}
+												</div>
+											) : null}
+											<div className="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-400 mb-6 text-gray-800 whitespace-pre-wrap leading-relaxed">
+												<span aria-hidden="true">💡 </span>
+												{thinkingText}
+											</div>
 										</div>
-									) : null}
-								</div>
-							))}
+									);
+								}
+
+								return (
+									<div
+										key={`${material.id}-${index}`}
+										className="bg-gray-100 p-4 rounded-lg mb-2 text-gray-800 whitespace-pre-wrap leading-relaxed"
+									>
+										{trimmedChunk}
+									</div>
+								);
+							})}
 						</section>
 					</article>
 				) : null}
