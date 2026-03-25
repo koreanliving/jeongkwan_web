@@ -146,7 +146,7 @@ export default function MaterialPage() {
 													PDF
 												</span>
 											) : null}
-											<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+											<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
 												{material.category}
 											</span>
 										</div>

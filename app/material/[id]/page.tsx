@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, type ComponentPropsWithoutRef } from "react";
+import { useEffect, useRef, useState, type ComponentPropsWithoutRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
-import { Download, FileText, Minus, Plus } from "lucide-react";
+import { Download, FileText } from "lucide-react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -71,22 +71,33 @@ export default function MaterialDetailPage() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
 	const [totalPages, setTotalPages] = useState(0);
-	const [currentPage, setCurrentPage] = useState(1);
-	const [pdfScale, setPdfScale] = useState(1);
-	const [pageWidth, setPageWidth] = useState(340);
+	const [pageWidth, setPageWidth] = useState(320);
 	const [pdfError, setPdfError] = useState("");
 	const resolvedFileUrl = resolveFileUrl(material?.file_url ?? null);
+	const pdfContainerRef = useRef<HTMLDivElement | null>(null);
 
 	useEffect(() => {
 		const updatePageWidth = () => {
-			setPageWidth(Math.min(Math.max(window.innerWidth - 56, 260), 760));
+			const current = pdfContainerRef.current;
+			if (!current) {
+				return;
+			}
+
+			setPageWidth(Math.max(Math.floor(current.clientWidth - 16), 260));
 		};
 
 		updatePageWidth();
-		window.addEventListener("resize", updatePageWidth);
+
+		const observer = new ResizeObserver(() => {
+			updatePageWidth();
+		});
+
+		if (pdfContainerRef.current) {
+			observer.observe(pdfContainerRef.current);
+		}
 
 		return () => {
-			window.removeEventListener("resize", updatePageWidth);
+			observer.disconnect();
 		};
 	}, []);
 
@@ -129,8 +140,7 @@ export default function MaterialDetailPage() {
 			}
 
 			setMaterial(data as MaterialDetail);
-			setCurrentPage(1);
-			setPdfScale(1);
+			setTotalPages(0);
 			setPdfError("");
 			setIsLoading(false);
 		};
@@ -170,7 +180,7 @@ export default function MaterialDetailPage() {
 					<article className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] sm:p-6">
 						<header>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+								<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
 									{material.category}
 								</span>
 								<p className="text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
@@ -201,24 +211,26 @@ export default function MaterialDetailPage() {
 									</a>
 								</div>
 
-								<div className="mt-4 overflow-x-auto rounded-xl border border-zinc-200 bg-white p-2">
+								<div ref={pdfContainerRef} className="mt-4 rounded-xl border border-zinc-200 bg-white p-2">
 									<Document
 										file={resolvedFileUrl}
 										onLoadSuccess={({ numPages }) => {
 											setTotalPages(numPages);
-											setCurrentPage(1);
 										}}
 										onLoadError={() => {
 											setPdfError("PDF를 불러오지 못했습니다. 파일 링크를 확인해 주세요.");
 										}}
 									>
-										<Page
-											pageNumber={currentPage}
-											scale={pdfScale}
-											width={pageWidth}
-											renderTextLayer={false}
-											renderAnnotationLayer={false}
-										/>
+										{Array.from({ length: totalPages }, (_, index) => (
+											<div key={`page-${index + 1}`} className="mb-2 flex justify-center last:mb-0">
+												<Page
+													pageNumber={index + 1}
+													width={pageWidth}
+													renderTextLayer={false}
+													renderAnnotationLayer={false}
+												/>
+											</div>
+										))}
 									</Document>
 								</div>
 
@@ -228,44 +240,8 @@ export default function MaterialDetailPage() {
 									</p>
 								) : null}
 
-								<div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-									<div className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white p-1">
-										<button
-											type="button"
-											onClick={() => setPdfScale((value) => Math.max(0.8, Number((value - 0.1).toFixed(1))))}
-											className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-zinc-700 hover:bg-zinc-100"
-										>
-											<Minus className="h-4 w-4" />
-										</button>
-										<span className="px-1 text-xs font-medium text-zinc-600 sm:text-sm">{Math.round(pdfScale * 100)}%</span>
-										<button
-											type="button"
-											onClick={() => setPdfScale((value) => Math.min(2, Number((value + 0.1).toFixed(1))))}
-											className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-zinc-700 hover:bg-zinc-100"
-										>
-											<Plus className="h-4 w-4" />
-										</button>
-									</div>
-
-									<div className="inline-flex items-center gap-2 rounded-xl border border-zinc-200 bg-white p-1">
-										<button
-											type="button"
-											onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
-											className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-100 sm:text-sm"
-										>
-											이전
-										</button>
-										<span className="text-xs font-medium text-zinc-600 sm:text-sm">
-											{currentPage} / {totalPages || "-"}
-										</span>
-										<button
-											type="button"
-											onClick={() => setCurrentPage((page) => (totalPages ? Math.min(totalPages, page + 1) : page))}
-											className="inline-flex min-h-10 items-center rounded-lg px-3 text-xs font-medium text-zinc-700 hover:bg-zinc-100 sm:text-sm"
-										>
-											다음
-										</button>
-									</div>
+								<div className="mt-3 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 sm:text-sm">
+									총 {totalPages || 0}페이지, 아래로 스크롤해서 연속으로 볼 수 있습니다.
 								</div>
 							</section>
 						) : (

@@ -150,7 +150,7 @@ export default function HomePage() {
 										<p className="text-sm font-medium text-zinc-800">{material.title}</p>
 										<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
 									</div>
-									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+									<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
 										{material.category}
 									</span>
 								</li>
