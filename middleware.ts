@@ -1,12 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const AUTH_COOKIE_NAME = "student_auth";
+const STUDENT_AUTH_COOKIE_NAME = "student_auth";
+const ADMIN_AUTH_COOKIE_NAME = "admin_auth";
 
 export function middleware(request: NextRequest) {
-	const authCookie = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-	const isAuthenticated = authCookie === "true";
+	const pathname = request.nextUrl.pathname;
+	const isStudentAuthenticated = request.cookies.get(STUDENT_AUTH_COOKIE_NAME)?.value === "true";
+	const isAdminAuthenticated = request.cookies.get(ADMIN_AUTH_COOKIE_NAME)?.value === "true";
 
-	if (!isAuthenticated) {
+	if (pathname.startsWith("/admin")) {
+		if (!isAdminAuthenticated) {
+			const adminLoginUrl = new URL("/admin-login", request.url);
+			return NextResponse.redirect(adminLoginUrl);
+		}
+
+		return NextResponse.next();
+	}
+
+	if (!isStudentAuthenticated) {
 		const loginUrl = new URL("/login", request.url);
 		return NextResponse.redirect(loginUrl);
 	}
@@ -15,5 +26,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: ["/", "/video", "/material", "/admin"],
+	matcher: ["/", "/video/:path*", "/material/:path*", "/admin/:path*"],
 };

@@ -31,6 +31,11 @@ export default function MaterialPage() {
 	const [materials, setMaterials] = useState<MaterialItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
+	const [isAdminUi, setIsAdminUi] = useState(false);
+
+	useEffect(() => {
+		setIsAdminUi(document.cookie.includes("admin_ui=true"));
+	}, []);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -78,12 +83,14 @@ export default function MaterialPage() {
 				<header>
 					<div className="flex items-center justify-between gap-3">
 						<h1 className="text-3xl font-bold tracking-tight text-zinc-900">자료실</h1>
-						<Link
-							href="/admin"
-							className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-						>
-							관리
-						</Link>
+						{isAdminUi ? (
+							<Link
+								href="/admin"
+								className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+							>
+								관리
+							</Link>
+						) : null}
 					</div>
 					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
 						{categoryTabs.map((tab) => (

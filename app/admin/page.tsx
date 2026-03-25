@@ -82,6 +82,14 @@ function toStoragePath(fileUrl: string | null) {
 	return fileUrl;
 }
 
+function getErrorMessage(error: unknown, fallback: string) {
+	if (typeof error === "object" && error && "message" in error && typeof error.message === "string") {
+		return error.message;
+	}
+
+	return fallback;
+}
+
 export default function AdminPage() {
 	const [materials, setMaterials] = useState<MaterialItem[]>([]);
 	const [videos, setVideos] = useState<VideoItem[]>([]);
@@ -236,8 +244,8 @@ export default function AdminPage() {
 			setNewFile(null);
 			setCreateMessage("자료가 저장되었습니다.");
 			await fetchAdminData();
-		} catch {
-			setCreateError("PDF 업로드 중 오류가 발생했습니다.");
+		} catch (error) {
+			setCreateError(getErrorMessage(error, "PDF 업로드 중 오류가 발생했습니다."));
 		} finally {
 			setIsCreating(false);
 		}
@@ -286,8 +294,8 @@ export default function AdminPage() {
 			setAttachFile(null);
 			setAttachMessage("PDF 첨부가 완료되었습니다.");
 			await fetchAdminData();
-		} catch {
-			setAttachError("PDF 업로드 중 오류가 발생했습니다.");
+		} catch (error) {
+			setAttachError(getErrorMessage(error, "PDF 업로드 중 오류가 발생했습니다."));
 		} finally {
 			setIsAttaching(false);
 		}
@@ -318,7 +326,7 @@ export default function AdminPage() {
 		});
 
 		if (error) {
-			setVideoError("영상 등록에 실패했습니다.");
+			setVideoError(error.message || "영상 등록에 실패했습니다.");
 			setIsCreatingVideo(false);
 			return;
 		}
@@ -348,7 +356,7 @@ export default function AdminPage() {
 
 		const { error } = await supabase.from("materials").delete().eq("id", material.id);
 		if (error) {
-			setDeleteError("자료 삭제에 실패했습니다.");
+			setDeleteError(error.message || "자료 삭제에 실패했습니다.");
 			setIsDeletingMaterialId(null);
 			return;
 		}
@@ -370,7 +378,7 @@ export default function AdminPage() {
 
 		const { error } = await supabase.from("videos").delete().eq("id", video.id);
 		if (error) {
-			setDeleteError("영상 삭제에 실패했습니다.");
+			setDeleteError(error.message || "영상 삭제에 실패했습니다.");
 			setIsDeletingVideoId(null);
 			return;
 		}
