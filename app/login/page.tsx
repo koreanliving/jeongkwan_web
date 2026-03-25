@@ -6,6 +6,7 @@ import Link from "next/link";
 
 export default function LoginPage() {
 	const router = useRouter();
+	const [studentId, setStudentId] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState("");
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -20,7 +21,7 @@ export default function LoginPage() {
 			headers: {
 				"Content-Type": "application/json",
 			},
-			body: JSON.stringify({ password }),
+			body: JSON.stringify({ studentId, password }),
 		});
 
 		if (response.ok) {
@@ -29,7 +30,7 @@ export default function LoginPage() {
 		}
 
 		const result = (await response.json()) as { message?: string };
-		setError(result.message ?? "비밀번호가 올바르지 않습니다. 다시 입력해 주세요.");
+		setError(result.message ?? "아이디 또는 비밀번호가 올바르지 않습니다. 다시 입력해 주세요.");
 		setIsSubmitting(false);
 	};
 
@@ -37,11 +38,27 @@ export default function LoginPage() {
 		<main className="flex min-h-screen items-center justify-center bg-zinc-100 px-5 py-10 text-zinc-900">
 			<section className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.35)]">
 				<h1 className="text-center text-2xl font-bold tracking-tight">수강생 인증</h1>
-				<p className="mt-2 text-center text-sm text-zinc-500">학생용 입장 코드로 로그인</p>
+				<p className="mt-2 text-center text-sm text-zinc-500">학생 계정으로 로그인</p>
 
 				<form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+					<label className="block text-sm font-medium text-zinc-700" htmlFor="studentId">
+						학생 아이디
+					</label>
+					<input
+						id="studentId"
+						type="text"
+						value={studentId}
+						onChange={(event) => {
+							setStudentId(event.target.value);
+							setError("");
+						}}
+						placeholder="예: 2-03"
+						className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+						required
+					/>
+
 					<label className="block text-sm font-medium text-zinc-700" htmlFor="password">
-						공통 비밀번호
+						비밀번호
 					</label>
 					<input
 						id="password"

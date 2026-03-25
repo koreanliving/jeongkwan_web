@@ -2,12 +2,12 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Link2, Save, Trash2, Upload, Video } from "lucide-react";
+import { Link2, MessageSquareText, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 import { parseStructuredMaterialContent } from "../../utils/materialParser";
 
 type Category = "문학" | "비문학";
-type AdminTab = "materials" | "videos" | "main";
+type AdminTab = "materials" | "videos" | "main" | "members" | "requests";
 
 type MaterialItem = {
 	id: number;
@@ -38,6 +38,29 @@ type HomeSetting = {
 	id: number;
 	welcome_title: string;
 	welcome_subtitle: string;
+};
+
+type StudentItem = {
+	id: number;
+	student_id: string;
+	name: string;
+	is_active: boolean;
+	created_at: string;
+};
+
+type StudentRequestItem = {
+	id: number;
+	student_id: number;
+	student_code: string;
+	student_name: string;
+	request_type: "보강영상" | "질문" | "상담";
+	title: string;
+	content: string;
+	status: "접수" | "처리중" | "완료";
+	admin_reply: string | null;
+	support_video_url: string | null;
+	created_at: string;
+	updated_at: string;
 };
 
 function toKoreanDate(value: string) {
@@ -139,12 +162,52 @@ export default function AdminPage() {
 	const [isSavingAnnouncementId, setIsSavingAnnouncementId] = useState<number | null>(null);
 	const [isDeletingAnnouncementId, setIsDeletingAnnouncementId] = useState<number | null>(null);
 
+	const [students, setStudents] = useState<StudentItem[]>([]);
+	const [studentRequests, setStudentRequests] = useState<StudentRequestItem[]>([]);
+	const [studentsError, setStudentsError] = useState("");
+	const [studentsMessage, setStudentsMessage] = useState("");
+	const [requestsError, setRequestsError] = useState("");
+	const [requestsMessage, setRequestsMessage] = useState("");
+	const [newStudentId, setNewStudentId] = useState("");
+	const [newStudentName, setNewStudentName] = useState("");
+	const [newStudentPassword, setNewStudentPassword] = useState("");
+	const [isCreatingStudent, setIsCreatingStudent] = useState(false);
+	const [isUpdatingStudentId, setIsUpdatingStudentId] = useState<number | null>(null);
+	const [isDeletingStudentId, setIsDeletingStudentId] = useState<number | null>(null);
+	const [isSavingRequestId, setIsSavingRequestId] = useState<number | null>(null);
+
 	const selectedMaterial = useMemo(
 		() => materials.find((item) => item.id === selectedMaterialId) ?? null,
 		[materials, selectedMaterialId],
 	);
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
+
+	const fetchManagementData = async () => {
+		const [studentsResponse, requestsResponse] = await Promise.all([
+			fetch("/api/admin/students", { cache: "no-store" }),
+			fetch("/api/admin/requests", { cache: "no-store" }),
+		]);
+
+		const studentsResult = (await studentsResponse.json()) as { students?: StudentItem[]; message?: string };
+		const requestsResult = (await requestsResponse.json()) as { requests?: StudentRequestItem[]; message?: string };
+
+		if (!studentsResponse.ok) {
+			setStudentsError(studentsResult.message ?? "학생 목록을 불러오지 못했습니다.");
+			setStudents([]);
+		} else {
+			setStudentsError("");
+			setStudents(studentsResult.students ?? []);
+		}
+
+		if (!requestsResponse.ok) {
+			setRequestsError(requestsResult.message ?? "요청 목록을 불러오지 못했습니다.");
+			setStudentRequests([]);
+		} else {
+			setRequestsError("");
+			setStudentRequests(requestsResult.requests ?? []);
+		}
+	};
 
 	const fetchAdminData = async () => {
 		setIsLoadingList(true);
@@ -183,6 +246,7 @@ export default function AdminPage() {
 		setMaterials((materialResult.data ?? []) as MaterialItem[]);
 		setVideos((videoResult.data ?? []) as VideoItem[]);
 		setAnnouncements((announcementResult.data ?? []) as AnnouncementItem[]);
+		await fetchManagementData();
 		setIsLoadingList(false);
 	};
 
@@ -456,6 +520,117 @@ export default function AdminPage() {
 		await fetchAdminData();
 	};
 
+	const handleCreateStudent = async (event: FormEvent) => {
+		event.preventDefault();
+		setStudentsError("");
+		setStudentsMessage("");
+
+		if (!newStudentId.trim() || !newStudentName.trim() || !newStudentPassword.trim()) {
+			setStudentsError("학생 아이디, 이름, 비밀번호를 모두 입력해 주세요.");
+			return;
+		}
+
+		setIsCreatingStudent(true);
+		const response = await fetch("/api/admin/students", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				studentId: newStudentId,
+				name: newStudentName,
+				password: newStudentPassword,
+			}),
+		});
+
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setStudentsError(result.message ?? "학생 추가에 실패했습니다.");
+			setIsCreatingStudent(false);
+			return;
+		}
+
+		setNewStudentId("");
+		setNewStudentName("");
+		setNewStudentPassword("");
+		setStudentsMessage("학생 계정이 추가되었습니다.");
+		setIsCreatingStudent(false);
+		await fetchManagementData();
+	};
+
+	const handleToggleStudent = async (student: StudentItem) => {
+		setStudentsError("");
+		setStudentsMessage("");
+		setIsUpdatingStudentId(student.id);
+
+		const response = await fetch("/api/admin/students", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: student.id, isActive: !student.is_active }),
+		});
+
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setStudentsError(result.message ?? "학생 상태 변경에 실패했습니다.");
+			setIsUpdatingStudentId(null);
+			return;
+		}
+
+		setStudentsMessage(!student.is_active ? "학생 계정을 활성화했습니다." : "학생 계정을 비활성화했습니다.");
+		setIsUpdatingStudentId(null);
+		await fetchManagementData();
+	};
+
+	const handleDeleteStudent = async (student: StudentItem) => {
+		if (!window.confirm(`정말 삭제할까요?\n${student.name} (${student.student_id})`)) return;
+		setStudentsError("");
+		setStudentsMessage("");
+		setIsDeletingStudentId(student.id);
+
+		const response = await fetch("/api/admin/students", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: student.id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setStudentsError(result.message ?? "학생 삭제에 실패했습니다.");
+			setIsDeletingStudentId(null);
+			return;
+		}
+
+		setStudentsMessage("학생 계정을 삭제했습니다.");
+		setIsDeletingStudentId(null);
+		await fetchManagementData();
+	};
+
+	const handleSaveRequest = async (
+		id: number,
+		status: StudentRequestItem["status"],
+		adminReply: string,
+		supportVideoUrl: string,
+	) => {
+		setRequestsError("");
+		setRequestsMessage("");
+		setIsSavingRequestId(id);
+
+		const response = await fetch("/api/admin/requests", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, status, adminReply, supportVideoUrl }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setRequestsError(result.message ?? "요청 답변 저장에 실패했습니다.");
+			setIsSavingRequestId(null);
+			return;
+		}
+
+		setRequestsMessage("요청 처리 내용이 저장되었습니다.");
+		setIsSavingRequestId(null);
+		await fetchManagementData();
+	};
+
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-12 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
 			<div className="mx-auto w-full max-w-4xl space-y-5">
@@ -468,11 +643,13 @@ export default function AdminPage() {
 						<Link href="/material" className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">자료실로</Link>
 					</div>
 
-					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
+					<div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-zinc-200/70 p-1.5 sm:grid-cols-5">
 						{[
 							{ key: "materials", label: "자료 업로드" },
 							{ key: "videos", label: "영상 업로드" },
 							{ key: "main", label: "메인 설정" },
+							{ key: "members", label: "회원관리" },
+							{ key: "requests", label: "요청관리" },
 						].map((tab) => (
 							<button
 								key={tab.key}
@@ -664,6 +841,88 @@ export default function AdminPage() {
 					</>
 				) : null}
 
+				{activeTab === "members" ? (
+					<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+						<div className="flex items-center gap-2">
+							<UserRound className="h-5 w-5 text-zinc-700" />
+							<h2 className="text-lg font-semibold text-zinc-900">학생 회원관리</h2>
+						</div>
+
+						<form className="mt-4 grid gap-2 sm:grid-cols-3" onSubmit={handleCreateStudent}>
+							<input
+								type="text"
+								value={newStudentId}
+								onChange={(e) => setNewStudentId(e.target.value)}
+								placeholder="학생 아이디"
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+							/>
+							<input
+								type="text"
+								value={newStudentName}
+								onChange={(e) => setNewStudentName(e.target.value)}
+								placeholder="학생 이름"
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+							/>
+							<input
+								type="text"
+								value={newStudentPassword}
+								onChange={(e) => setNewStudentPassword(e.target.value)}
+								placeholder="비밀번호"
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+							/>
+							<button type="submit" disabled={isCreatingStudent} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400 sm:col-span-3">
+								{isCreatingStudent ? "추가 중..." : "학생 계정 추가"}
+							</button>
+						</form>
+
+						{studentsError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{studentsError}</p> : null}
+						{studentsMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{studentsMessage}</p> : null}
+
+						<div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
+							{students.map((student) => (
+								<div key={student.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+									<p className="text-sm font-medium text-zinc-900">{student.name} ({student.student_id})</p>
+									<p className="mt-0.5 text-xs text-zinc-500">가입일: {toKoreanDate(student.created_at)}</p>
+									<div className="mt-2 flex items-center gap-2">
+										<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${student.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"}`}>
+											{student.is_active ? "활성" : "비활성"}
+										</span>
+										<button type="button" onClick={() => handleToggleStudent(student)} disabled={isUpdatingStudentId === student.id} className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60">
+											{isUpdatingStudentId === student.id ? "처리 중..." : student.is_active ? "비활성화" : "활성화"}
+										</button>
+										<button type="button" onClick={() => handleDeleteStudent(student)} disabled={isDeletingStudentId === student.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+											<Trash2 className="h-3.5 w-3.5" />{isDeletingStudentId === student.id ? "삭제 중..." : "삭제"}
+										</button>
+									</div>
+								</div>
+							))}
+						</div>
+					</section>
+				) : null}
+
+				{activeTab === "requests" ? (
+					<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+						<div className="flex items-center gap-2">
+							<MessageSquareText className="h-5 w-5 text-zinc-700" />
+							<h2 className="text-lg font-semibold text-zinc-900">학생 요청관리</h2>
+						</div>
+						{requestsError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{requestsError}</p> : null}
+						{requestsMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{requestsMessage}</p> : null}
+
+						<div className="mt-4 space-y-3">
+							{studentRequests.map((item) => (
+								<RequestEditor
+									key={item.id}
+									item={item}
+									onSave={handleSaveRequest}
+									isSaving={isSavingRequestId === item.id}
+								/>
+							))}
+							{studentRequests.length === 0 ? <p className="text-sm text-zinc-500">접수된 요청이 없습니다.</p> : null}
+						</div>
+					</section>
+				) : null}
+
 				{listError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{listError}</p> : null}
 			</div>
 		</main>
@@ -700,6 +959,70 @@ function AnnouncementEditor({ item, onSave, onDelete, isSaving, isDeleting }: An
 					<Trash2 className="h-3.5 w-3.5" />{isDeleting ? "삭제 중..." : "삭제"}
 				</button>
 			</div>
+		</div>
+	);
+}
+
+type RequestEditorProps = {
+	item: StudentRequestItem;
+	onSave: (id: number, status: StudentRequestItem["status"], adminReply: string, supportVideoUrl: string) => Promise<void>;
+	isSaving: boolean;
+};
+
+function RequestEditor({ item, onSave, isSaving }: RequestEditorProps) {
+	const [status, setStatus] = useState<StudentRequestItem["status"]>(item.status);
+	const [adminReply, setAdminReply] = useState(item.admin_reply || "");
+	const [supportVideoUrl, setSupportVideoUrl] = useState(item.support_video_url || "");
+
+	useEffect(() => {
+		setStatus(item.status);
+		setAdminReply(item.admin_reply || "");
+		setSupportVideoUrl(item.support_video_url || "");
+	}, [item.id, item.status, item.admin_reply, item.support_video_url]);
+
+	return (
+		<div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+			<p className="text-xs text-zinc-500">
+				{item.request_type} · {item.student_name} ({item.student_code}) · {toKoreanDate(item.created_at)}
+			</p>
+			<h3 className="mt-1 text-sm font-semibold text-zinc-900">{item.title}</h3>
+			<p className="mt-1 text-sm text-zinc-700">{item.content}</p>
+
+			<div className="mt-3 grid gap-2 sm:grid-cols-2">
+				<select
+					value={status}
+					onChange={(e) => setStatus(e.target.value as StudentRequestItem["status"])}
+					className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+				>
+					<option value="접수">접수</option>
+					<option value="처리중">처리중</option>
+					<option value="완료">완료</option>
+				</select>
+				<input
+					type="url"
+					value={supportVideoUrl}
+					onChange={(e) => setSupportVideoUrl(e.target.value)}
+					placeholder="보강 영상 링크 (선택)"
+					className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+				/>
+			</div>
+
+			<textarea
+				rows={3}
+				value={adminReply}
+				onChange={(e) => setAdminReply(e.target.value)}
+				placeholder="학생에게 보낼 답변"
+				className="mt-2 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+			/>
+
+			<button
+				type="button"
+				onClick={() => onSave(item.id, status, adminReply, supportVideoUrl)}
+				disabled={isSaving}
+				className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+			>
+				{isSaving ? "저장 중..." : "처리 내용 저장"}
+			</button>
 		</div>
 	);
 }

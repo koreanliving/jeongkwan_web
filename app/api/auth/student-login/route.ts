@@ -1,19 +1,44 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
 const STUDENT_COOKIE_NAME = "student_auth";
-const STUDENT_PASSWORD = process.env.STUDENT_PASSWORD ?? "0000";
 
 export async function POST(request: Request) {
 	try {
-		const body = (await request.json()) as { password?: string };
-		const password = body.password ?? "";
+		const body = (await request.json()) as { studentId?: string; password?: string };
+		const studentId = (body.studentId ?? "").trim();
+		const password = (body.password ?? "").trim();
 
-		if (password !== STUDENT_PASSWORD) {
-			return NextResponse.json({ message: "비밀번호가 올바르지 않습니다." }, { status: 401 });
+		if (!studentId || !password) {
+			return NextResponse.json({ message: "아이디와 비밀번호를 입력해 주세요." }, { status: 400 });
+		}
+
+		const { data: student, error: studentError } = await supabaseAdmin
+			.from("students")
+			.select("id, password, is_active")
+			.eq("student_id", studentId)
+			.maybeSingle();
+
+		if (studentError || !student || !student.is_active || student.password !== password) {
+			return NextResponse.json({ message: "아이디 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
+		}
+
+		const sessionToken = randomUUID();
+		const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7).toISOString();
+
+		const { error: sessionError } = await supabaseAdmin.from("student_sessions").insert({
+			session_token: sessionToken,
+			student_id: student.id,
+			expires_at: expiresAt,
+		});
+
+		if (sessionError) {
+			return NextResponse.json({ message: "로그인 세션 생성에 실패했습니다." }, { status: 500 });
 		}
 
 		const response = NextResponse.json({ ok: true });
-		response.cookies.set(STUDENT_COOKIE_NAME, "true", {
+		response.cookies.set(STUDENT_COOKIE_NAME, sessionToken, {
 			path: "/",
 			maxAge: 60 * 60 * 24 * 7,
 			sameSite: "lax",

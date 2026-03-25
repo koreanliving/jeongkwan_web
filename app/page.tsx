@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Home, PlayCircle } from "lucide-react";
+import { FileText, Home, MessageSquareText, PlayCircle } from "lucide-react";
 import { supabase } from "../utils/supabase";
 
 const navItems = [
 	{ label: "홈", href: "/", icon: Home, active: true },
 	{ label: "영상", href: "/video", icon: PlayCircle, active: false },
 	{ label: "자료", href: "/material", icon: FileText, active: false },
+	{ label: "요청", href: "/request", icon: MessageSquareText, active: false },
 ];
 
 type AnnouncementItem = {
@@ -181,7 +182,7 @@ export default function HomePage() {
 			</div>
 
 			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-3 gap-2">
+				<ul className="mx-auto grid w-full max-w-sm grid-cols-4 gap-2">
 					{navItems.map(({ label, href, icon: Icon, active }) => (
 						<li key={label}>
 							<Link

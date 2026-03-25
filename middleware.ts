@@ -5,7 +5,8 @@ const ADMIN_AUTH_COOKIE_NAME = "admin_auth";
 
 export function middleware(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
-	const isStudentAuthenticated = request.cookies.get(STUDENT_AUTH_COOKIE_NAME)?.value === "true";
+	const studentCookie = request.cookies.get(STUDENT_AUTH_COOKIE_NAME)?.value;
+	const isStudentAuthenticated = Boolean(studentCookie && studentCookie.length > 0);
 	const isAdminAuthenticated = request.cookies.get(ADMIN_AUTH_COOKIE_NAME)?.value === "true";
 
 	if (pathname.startsWith("/admin")) {
@@ -26,5 +27,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: ["/", "/video/:path*", "/material/:path*", "/admin/:path*"],
+	matcher: ["/", "/video/:path*", "/material/:path*", "/request/:path*", "/admin/:path*"],
 };
