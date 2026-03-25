@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { Paperclip } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -13,6 +14,7 @@ type MaterialItem = {
 	title: string;
 	content: string;
 	category: "문학" | "비문학";
+	file_name: string | null;
 	created_at: string;
 };
 
@@ -39,7 +41,7 @@ export default function MaterialPage() {
 
 			let query = supabase
 				.from("materials")
-				.select("id, title, content, category, created_at")
+				.select("id, title, content, category, file_name, created_at")
 				.order("created_at", { ascending: false });
 
 			if (activeTab !== "전체") {
@@ -74,7 +76,15 @@ export default function MaterialPage() {
 		<main className="min-h-screen bg-zinc-100 px-5 pb-10 pt-8 text-zinc-800">
 			<div className="mx-auto w-full max-w-sm">
 				<header>
-					<h1 className="text-3xl font-bold tracking-tight text-zinc-900">자료실</h1>
+					<div className="flex items-center justify-between gap-3">
+						<h1 className="text-3xl font-bold tracking-tight text-zinc-900">자료실</h1>
+						<Link
+							href="/admin"
+							className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
+						>
+							관리
+						</Link>
+					</div>
 					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
 						{categoryTabs.map((tab) => (
 							<button
@@ -122,9 +132,17 @@ export default function MaterialPage() {
 								<article>
 									<div className="flex items-start justify-between gap-3">
 										<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
-										<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
-											{material.category}
-										</span>
+										<div className="flex items-center gap-1.5">
+											{material.file_name ? (
+												<span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600">
+													<Paperclip className="h-3 w-3" />
+													PDF
+												</span>
+											) : null}
+											<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium text-white">
+												{material.category}
+											</span>
+										</div>
 									</div>
 									<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
 									<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">{material.content}</p>
