@@ -13,6 +13,7 @@ const navItems = [
 
 type AnnouncementItem = {
 	id: number;
+	title: string;
 	content: string;
 	created_at: string;
 };
@@ -56,7 +57,7 @@ export default function HomePage() {
 			const [announcementResult, materialResult, settingResult] = await Promise.all([
 				supabase
 					.from("announcements")
-					.select("id, content, created_at")
+					.select("id, title, content, created_at")
 					.order("created_at", { ascending: false })
 					.limit(3),
 				supabase
@@ -131,6 +132,7 @@ export default function HomePage() {
 						<ul className="mt-3 space-y-2">
 							{announcements.map((announcement) => (
 								<li key={announcement.id} className="rounded-2xl bg-zinc-100 px-3 py-2.5">
+									<p className="text-sm font-semibold text-zinc-900">{announcement.title || "공지"}</p>
 									<p className="text-sm leading-relaxed text-zinc-800">{announcement.content}</p>
 									<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(announcement.created_at)}</p>
 								</li>
