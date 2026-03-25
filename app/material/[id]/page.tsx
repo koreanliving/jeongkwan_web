@@ -180,26 +180,6 @@ export default function MaterialDetailPage() {
 							</h1>
 						</header>
 
-						<section className="mt-6 text-sm text-zinc-800 sm:text-base">
-							<ReactMarkdown
-								components={{
-									blockquote: ({ children }: ComponentPropsWithoutRef<"blockquote">) => (
-										<blockquote className="bg-gray-100 p-5 rounded-xl mb-3 text-gray-800 text-lg font-bold border-l-4 border-gray-400">
-											{children}
-										</blockquote>
-									),
-									p: ({ children }: ComponentPropsWithoutRef<"p">) => (
-										<p className="bg-blue-50 p-5 rounded-xl mb-8 text-gray-700 leading-relaxed">
-											<span aria-hidden="true">💡 사고 과정 : </span>
-											{children}
-										</p>
-									),
-								}}
-							>
-								{material.content}
-							</ReactMarkdown>
-						</section>
-
 						{resolvedFileUrl ? (
 							<section className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4 sm:p-5">
 								<div className="flex flex-wrap items-start justify-between gap-3">
@@ -296,6 +276,28 @@ export default function MaterialDetailPage() {
 								</div>
 							</section>
 						)}
+
+						{material.content.trim() ? (
+							<section className="mt-6 text-sm text-zinc-800 sm:text-base">
+								<ReactMarkdown
+									components={{
+										blockquote: ({ children }: ComponentPropsWithoutRef<"blockquote">) => (
+											<blockquote className="bg-gray-100 p-5 rounded-xl mb-3 text-gray-800 text-lg font-bold border-l-4 border-gray-400">
+												{children}
+											</blockquote>
+										),
+										p: ({ children }: ComponentPropsWithoutRef<"p">) => (
+											<p className="bg-blue-50 p-5 rounded-xl mb-8 text-gray-700 leading-relaxed">
+												<span aria-hidden="true">💡 사고 과정 : </span>
+												{children}
+											</p>
+										),
+									}}
+								>
+									{material.content}
+								</ReactMarkdown>
+							</section>
+						) : null}
 					</article>
 				) : null}
 			</div>

@@ -145,7 +145,9 @@ export default function MaterialPage() {
 										</div>
 									</div>
 									<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
-									<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">{material.content}</p>
+									<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">
+										{material.content.trim() || (material.file_name ? "PDF 첨부 자료입니다. 상세 페이지에서 바로 볼 수 있습니다." : "")}
+									</p>
 								</article>
 							</Link>
 						))
