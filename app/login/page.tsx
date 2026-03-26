@@ -30,7 +30,11 @@ export default function LoginPage() {
 		}
 
 		const result = (await response.json()) as { message?: string };
-		setError(result.message ?? "아이디 또는 비밀번호가 올바르지 않습니다. 다시 입력해 주세요.");
+		if (result.message?.includes("승인 대기중") || result.message?.includes("승인중")) {
+			setError("가입 신청이 승인 대기중입니다. 승인 후 로그인 가능합니다.");
+		} else {
+			setError(result.message ?? "아이디 또는 비밀번호가 올바르지 않습니다. 다시 입력해 주세요.");
+		}
 		setIsSubmitting(false);
 	};
 
