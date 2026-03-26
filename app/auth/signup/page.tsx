@@ -34,6 +34,10 @@ export default function SignupPage() {
 			setError("아이디, 비밀번호, 이름, 연락처는 필수입니다.");
 			return;
 		}
+		if (!/^[a-zA-Z0-9_]{4,20}$/.test(studentId.trim())) {
+			setError("아이디는 영문/숫자/_ 조합 4~20자로 입력해 주세요.");
+			return;
+		}
 		if (password !== passwordConfirm) {
 			setError("비밀번호가 일치하지 않습니다.");
 			return;

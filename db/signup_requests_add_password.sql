@@ -1,2 +1,3 @@
--- 비밀번호 컬럼 추가 (nullable, 승인 시 students 테이블로 복사)
+-- 기존 signup_requests 테이블에 누락 컬럼 보강
+ALTER TABLE public.signup_requests ADD COLUMN IF NOT EXISTS student_id text;
 ALTER TABLE public.signup_requests ADD COLUMN IF NOT EXISTS password text;
