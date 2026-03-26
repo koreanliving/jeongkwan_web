@@ -16,8 +16,9 @@ export async function GET(request: NextRequest) {
 
 	const { data, error } = await supabaseAdmin
 		.from("student_requests")
-		.select("id, request_type, title, content, status, admin_reply, support_video_url, created_at, updated_at")
+		.select("id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at")
 		.eq("student_id", session.studentDbId)
+		.eq("is_deleted", false)
 		.order("created_at", { ascending: false });
 
 	if (error) {
@@ -63,6 +64,43 @@ export async function POST(request: NextRequest) {
 
 		if (error) {
 			return NextResponse.json({ message: "요청 등록에 실패했습니다." }, { status: 500 });
+		}
+
+		return NextResponse.json({ ok: true });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function DELETE(request: NextRequest) {
+	const session = await getStudentSession(request);
+	if (!session) {
+		return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+	}
+
+	try {
+		const body = (await request.json()) as { id?: number };
+		if (!body.id) {
+			return NextResponse.json({ message: "삭제할 요청 ID가 필요합니다." }, { status: 400 });
+		}
+
+		const { data: requestData, error: fetchError } = await supabaseAdmin
+			.from("student_requests")
+			.select("id, student_id")
+			.eq("id", body.id)
+			.maybeSingle();
+
+		if (fetchError || !requestData || requestData.student_id !== session.studentDbId) {
+			return NextResponse.json({ message: "요청을 찾을 수 없습니다." }, { status: 404 });
+		}
+
+		const { error } = await supabaseAdmin
+			.from("student_requests")
+			.update({ is_deleted: true, updated_at: new Date().toISOString() })
+			.eq("id", body.id);
+
+		if (error) {
+			return NextResponse.json({ message: "요청 삭제에 실패했습니다." }, { status: 500 });
 		}
 
 		return NextResponse.json({ ok: true });

@@ -43,6 +43,7 @@ export default function RequestPage() {
 	const [requests, setRequests] = useState<StudentRequest[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
+	const [deletingId, setDeletingId] = useState<number | null>(null);
 	const [error, setError] = useState("");
 	const [message, setMessage] = useState("");
 
@@ -103,6 +104,30 @@ export default function RequestPage() {
 		setRequestType("질문");
 		setMessage("요청이 접수되었습니다.");
 		setIsSubmitting(false);
+		await fetchRequests();
+	};
+
+	const handleDelete = async (id: number) => {
+		if (!window.confirm("이 요청을 삭제할까요?")) return;
+		setDeletingId(id);
+		setError("");
+		setMessage("");
+
+		const response = await fetch("/api/requests", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setError(result.message ?? "요청 삭제에 실패했습니다.");
+			setDeletingId(null);
+			return;
+		}
+
+		setMessage("요청이 삭제되었습니다.");
+		setDeletingId(null);
 		await fetchRequests();
 	};
 
@@ -170,7 +195,7 @@ export default function RequestPage() {
 									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white">{item.status}</span>
 								</div>
 								<p className="mt-2 text-sm text-zinc-700">{item.content}</p>
-								{item.admin_reply ? <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-700">관리자 답변: {item.admin_reply}</p> : null}
+								{item.admin_reply ? <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-700">이정관T: {item.admin_reply}</p> : null}
 								{item.support_video_url ? (
 									<a
 										href={item.support_video_url}
@@ -181,6 +206,14 @@ export default function RequestPage() {
 										보강 영상 링크 열기
 									</a>
 								) : null}
+								<button
+									type="button"
+									onClick={() => handleDelete(item.id)}
+									disabled={deletingId === item.id}
+									className="mt-2 inline-flex rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+								>
+									{deletingId === item.id ? "삭제 중..." : "요청 삭제"}
+								</button>
 							</article>
 						))}
 					</div>

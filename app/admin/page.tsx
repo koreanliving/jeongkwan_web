@@ -59,6 +59,22 @@ type StudentRequestItem = {
 	status: "접수" | "처리중" | "완료";
 	admin_reply: string | null;
 	support_video_url: string | null;
+	is_deleted: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+type SignupRequestItem = {
+	id: number;
+	student_name: string;
+	academy: "서정학원" | "다올105" | "라파에듀" | "입시왕";
+	phone: string;
+	grade: string;
+	recent_test: string | null;
+	recent_grade: string | null;
+	selected_subject: string | null;
+	status: "대기" | "승인" | "거절";
+	admin_note: string | null;
 	created_at: string;
 	updated_at: string;
 };
@@ -164,8 +180,11 @@ export default function AdminPage() {
 
 	const [students, setStudents] = useState<StudentItem[]>([]);
 	const [studentRequests, setStudentRequests] = useState<StudentRequestItem[]>([]);
+	const [signupRequests, setSignupRequests] = useState<SignupRequestItem[]>([]);
 	const [studentsError, setStudentsError] = useState("");
 	const [studentsMessage, setStudentsMessage] = useState("");
+	const [signupError, setSignupError] = useState("");
+	const [signupMessage, setSignupMessage] = useState("");
 	const [requestsError, setRequestsError] = useState("");
 	const [requestsMessage, setRequestsMessage] = useState("");
 	const [newStudentId, setNewStudentId] = useState("");
@@ -175,6 +194,9 @@ export default function AdminPage() {
 	const [isUpdatingStudentId, setIsUpdatingStudentId] = useState<number | null>(null);
 	const [isDeletingStudentId, setIsDeletingStudentId] = useState<number | null>(null);
 	const [isSavingRequestId, setIsSavingRequestId] = useState<number | null>(null);
+	const [isProcessingSignupId, setIsProcessingSignupId] = useState<number | null>(null);
+	const [isDeletingSignupId, setIsDeletingSignupId] = useState<number | null>(null);
+	const [isDeletingRequestId, setIsDeletingRequestId] = useState<number | null>(null);
 
 	const selectedMaterial = useMemo(
 		() => materials.find((item) => item.id === selectedMaterialId) ?? null,
@@ -184,13 +206,15 @@ export default function AdminPage() {
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
 	const fetchManagementData = async () => {
-		const [studentsResponse, requestsResponse] = await Promise.all([
+		const [studentsResponse, requestsResponse, signupResponse] = await Promise.all([
 			fetch("/api/admin/students", { cache: "no-store" }),
 			fetch("/api/admin/requests", { cache: "no-store" }),
+			fetch("/api/admin/signup", { cache: "no-store" }),
 		]);
 
 		const studentsResult = (await studentsResponse.json()) as { students?: StudentItem[]; message?: string };
 		const requestsResult = (await requestsResponse.json()) as { requests?: StudentRequestItem[]; message?: string };
+		const signupResult = (await signupResponse.json()) as { signupRequests?: SignupRequestItem[]; message?: string };
 
 		if (!studentsResponse.ok) {
 			setStudentsError(studentsResult.message ?? "학생 목록을 불러오지 못했습니다.");
@@ -206,6 +230,14 @@ export default function AdminPage() {
 		} else {
 			setRequestsError("");
 			setStudentRequests(requestsResult.requests ?? []);
+		}
+
+		if (!signupResponse.ok) {
+			setSignupError(signupResult.message ?? "가입신청 목록을 불러오지 못했습니다.");
+			setSignupRequests([]);
+		} else {
+			setSignupError("");
+			setSignupRequests(signupResult.signupRequests ?? []);
 		}
 	};
 
@@ -631,6 +663,86 @@ export default function AdminPage() {
 		await fetchManagementData();
 	};
 
+	const handleApproveSignup = async (item: SignupRequestItem, action: "approve" | "reject") => {
+		setSignupError("");
+		setSignupMessage("");
+		setIsProcessingSignupId(item.id);
+
+		const response = await fetch("/api/admin/signup", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: item.id, action }),
+		});
+		const result = (await response.json()) as {
+			message?: string;
+			studentId?: string;
+			defaultPassword?: string;
+		};
+
+		if (!response.ok) {
+			setSignupError(result.message ?? "가입 신청 처리에 실패했습니다.");
+			setIsProcessingSignupId(null);
+			return;
+		}
+
+		if (action === "approve") {
+			setSignupMessage(`승인 완료: ${result.studentId} / 초기비밀번호 ${result.defaultPassword}`);
+		} else {
+			setSignupMessage("가입 신청을 거절 처리했습니다.");
+		}
+
+		setIsProcessingSignupId(null);
+		await fetchManagementData();
+	};
+
+	const handleDeleteSignup = async (id: number) => {
+		if (!window.confirm("이 가입 신청 내역을 삭제할까요?")) return;
+		setIsDeletingSignupId(id);
+		setSignupError("");
+		setSignupMessage("");
+
+		const response = await fetch("/api/admin/signup", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setSignupError(result.message ?? "가입 신청 삭제에 실패했습니다.");
+			setIsDeletingSignupId(null);
+			return;
+		}
+
+		setSignupMessage("가입 신청 내역을 삭제했습니다.");
+		setIsDeletingSignupId(null);
+		await fetchManagementData();
+	};
+
+	const handleDeleteRequestForAdmin = async (id: number) => {
+		if (!window.confirm("이 요청을 관리자 목록에서 완전히 삭제할까요?")) return;
+		setIsDeletingRequestId(id);
+		setRequestsError("");
+		setRequestsMessage("");
+
+		const response = await fetch("/api/admin/requests", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setRequestsError(result.message ?? "요청 삭제에 실패했습니다.");
+			setIsDeletingRequestId(null);
+			return;
+		}
+
+		setRequestsMessage("요청을 관리자 목록에서 삭제했습니다.");
+		setIsDeletingRequestId(null);
+		await fetchManagementData();
+	};
+
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-12 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
 			<div className="mx-auto w-full max-w-4xl space-y-5">
@@ -897,6 +1009,53 @@ export default function AdminPage() {
 								</div>
 							))}
 						</div>
+
+						<div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+							<h3 className="text-sm font-semibold text-zinc-900">가입 신청 리스트</h3>
+							{signupError ? <p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{signupError}</p> : null}
+							{signupMessage ? <p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{signupMessage}</p> : null}
+							<div className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+								{signupRequests.map((item) => (
+									<div key={item.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+										<p className="text-sm font-semibold text-zinc-900">{item.student_name} · {item.academy}</p>
+										<p className="mt-1 text-xs text-zinc-600">연락처: {item.phone} · 학년: {item.grade}</p>
+										<p className="mt-1 text-xs text-zinc-500">최근 모의고사: {item.recent_test || "-"} · 등급: {item.recent_grade || "-"}</p>
+										<p className="mt-1 text-xs text-zinc-500">선택과목: {item.selected_subject || "-"}</p>
+										<p className="mt-1 text-xs text-zinc-500">신청일: {toKoreanDate(item.created_at)}</p>
+										<div className="mt-2 flex flex-wrap items-center gap-2">
+											<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${item.status === "승인" ? "bg-emerald-100 text-emerald-700" : item.status === "거절" ? "bg-rose-100 text-rose-700" : "bg-zinc-200 text-zinc-700"}`}>
+												{item.status}
+											</span>
+											<button
+												type="button"
+												onClick={() => handleApproveSignup(item, "approve")}
+												disabled={item.status !== "대기" || isProcessingSignupId === item.id}
+												className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isProcessingSignupId === item.id ? "처리 중..." : "승인"}
+											</button>
+											<button
+												type="button"
+												onClick={() => handleApproveSignup(item, "reject")}
+												disabled={item.status !== "대기" || isProcessingSignupId === item.id}
+												className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												거절
+											</button>
+											<button
+												type="button"
+												onClick={() => handleDeleteSignup(item.id)}
+												disabled={isDeletingSignupId === item.id}
+												className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isDeletingSignupId === item.id ? "삭제 중..." : "신청 삭제"}
+											</button>
+										</div>
+									</div>
+								))}
+								{signupRequests.length === 0 ? <p className="text-sm text-zinc-500">가입 신청이 없습니다.</p> : null}
+							</div>
+						</div>
 					</section>
 				) : null}
 
@@ -915,6 +1074,8 @@ export default function AdminPage() {
 									key={item.id}
 									item={item}
 									onSave={handleSaveRequest}
+									onDelete={handleDeleteRequestForAdmin}
+									isDeleting={isDeletingRequestId === item.id}
 									isSaving={isSavingRequestId === item.id}
 								/>
 							))}
@@ -966,10 +1127,12 @@ function AnnouncementEditor({ item, onSave, onDelete, isSaving, isDeleting }: An
 type RequestEditorProps = {
 	item: StudentRequestItem;
 	onSave: (id: number, status: StudentRequestItem["status"], adminReply: string, supportVideoUrl: string) => Promise<void>;
+	onDelete: (id: number) => Promise<void>;
 	isSaving: boolean;
+	isDeleting: boolean;
 };
 
-function RequestEditor({ item, onSave, isSaving }: RequestEditorProps) {
+function RequestEditor({ item, onSave, onDelete, isSaving, isDeleting }: RequestEditorProps) {
 	const [status, setStatus] = useState<StudentRequestItem["status"]>(item.status);
 	const [adminReply, setAdminReply] = useState(item.admin_reply || "");
 	const [supportVideoUrl, setSupportVideoUrl] = useState(item.support_video_url || "");
@@ -985,6 +1148,11 @@ function RequestEditor({ item, onSave, isSaving }: RequestEditorProps) {
 			<p className="text-xs text-zinc-500">
 				{item.request_type} · {item.student_name} ({item.student_code}) · {toKoreanDate(item.created_at)}
 			</p>
+			{item.is_deleted ? (
+				<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+					학생 화면에서 삭제됨
+				</p>
+			) : null}
 			<h3 className="mt-1 text-sm font-semibold text-zinc-900">{item.title}</h3>
 			<p className="mt-1 text-sm text-zinc-700">{item.content}</p>
 
@@ -1015,14 +1183,24 @@ function RequestEditor({ item, onSave, isSaving }: RequestEditorProps) {
 				className="mt-2 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
 			/>
 
-			<button
-				type="button"
-				onClick={() => onSave(item.id, status, adminReply, supportVideoUrl)}
-				disabled={isSaving}
-				className="mt-2 inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
-			>
-				{isSaving ? "저장 중..." : "처리 내용 저장"}
-			</button>
+			<div className="mt-2 flex items-center gap-2">
+				<button
+					type="button"
+					onClick={() => onSave(item.id, status, adminReply, supportVideoUrl)}
+					disabled={isSaving}
+					className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{isSaving ? "저장 중..." : "처리 내용 저장"}
+				</button>
+				<button
+					type="button"
+					onClick={() => onDelete(item.id)}
+					disabled={isDeleting}
+					className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{isDeleting ? "삭제 중..." : "요청 완전 삭제"}
+				</button>
+			</div>
 		</div>
 	);
 }

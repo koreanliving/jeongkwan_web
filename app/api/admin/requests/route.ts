@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 
 	const { data, error } = await supabaseAdmin
 		.from("student_requests")
-		.select("id, request_type, title, content, status, admin_reply, support_video_url, created_at, updated_at, student_id")
+		.select("id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at, student_id")
 		.order("created_at", { ascending: false })
 		.limit(300);
 
@@ -76,6 +76,28 @@ export async function PATCH(request: NextRequest) {
 		const { error } = await supabaseAdmin.from("student_requests").update(updatePayload).eq("id", body.id);
 		if (error) {
 			return NextResponse.json({ message: "요청 답변 저장에 실패했습니다." }, { status: 500 });
+		}
+
+		return NextResponse.json({ ok: true });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function DELETE(request: NextRequest) {
+	if (!isAdminRequest(request)) {
+		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
+	}
+
+	try {
+		const body = (await request.json()) as { id?: number };
+		if (!body.id) {
+			return NextResponse.json({ message: "삭제할 요청 ID가 필요합니다." }, { status: 400 });
+		}
+
+		const { error } = await supabaseAdmin.from("student_requests").delete().eq("id", body.id);
+		if (error) {
+			return NextResponse.json({ message: "요청 삭제에 실패했습니다." }, { status: 500 });
 		}
 
 		return NextResponse.json({ ok: true });

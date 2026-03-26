@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
+import { FileText, Home, MessageSquareText, Paperclip, PlayCircle } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -12,6 +12,7 @@ type CategoryTab = (typeof categoryTabs)[number];
 type MaterialItem = {
 	id: number;
 	title: string;
+	subtitle: string | null;
 	content: string;
 	category: "문학" | "비문학";
 	file_name: string | null;
@@ -46,7 +47,7 @@ export default function MaterialPage() {
 
 			let query = supabase
 				.from("materials")
-				.select("id, title, content, category, file_name, created_at")
+				.select("id, title, subtitle, content, category, file_name, created_at")
 				.order("created_at", { ascending: false });
 
 			if (activeTab !== "전체") {
@@ -78,7 +79,7 @@ export default function MaterialPage() {
 	}, [activeTab]);
 
 	return (
-		<main className="min-h-screen bg-zinc-100 px-5 pb-10 pt-8 text-zinc-800">
+		<main className="min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
 			<div className="mx-auto w-full max-w-sm">
 				<header>
 					<div className="flex items-center justify-between gap-3">
@@ -131,36 +132,65 @@ export default function MaterialPage() {
 
 					{!isLoading && !errorMessage
 						? materials.map((material) => (
-							<Link
-								key={material.id}
-								href={`/material/${material.id}`}
-								className="block rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
-							>
-								<article>
-									<div className="flex items-start justify-between gap-3">
-										<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
-										<div className="flex items-center gap-1.5">
-											{material.file_name ? (
-												<span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600">
-													<Paperclip className="h-3 w-3" />
-													PDF
+								<Link
+									key={material.id}
+									href={`/material/${material.id}`}
+									className="block rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
+								>
+									<article>
+										<div className="flex items-start justify-between gap-3">
+											<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
+											<div className="flex items-center gap-1.5">
+												{material.file_name ? (
+													<span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600">
+														<Paperclip className="h-3 w-3" />
+														PDF
+													</span>
+												) : null}
+												<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
+													{material.category}
 												</span>
-											) : null}
-											<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
-												{material.category}
-											</span>
+											</div>
 										</div>
-									</div>
-									<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
-									<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">
-										{material.content.trim() || (material.file_name ? "PDF 첨부 자료입니다. 상세 페이지에서 바로 볼 수 있습니다." : "")}
-									</p>
-								</article>
-							</Link>
-						))
+										<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+										<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">
+											{material.subtitle || material.content.trim() || (material.file_name ? "PDF 첨부 자료입니다. 상세 페이지에서 바로 볼 수 있습니다." : "")}
+										</p>
+									</article>
+								</Link>
+							))
 						: null}
 				</section>
 			</div>
+
+			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
+				<ul className="mx-auto grid w-full max-w-sm grid-cols-4 gap-2">
+					<li>
+						<Link href="/" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<Home className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>홈</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/video" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<PlayCircle className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>영상</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/material" aria-current="page" className="flex w-full flex-col items-center justify-center rounded-2xl bg-zinc-900 py-2.5 text-xs font-medium text-white shadow-sm transition">
+							<FileText className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>자료</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/request" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<MessageSquareText className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>요청</span>
+						</Link>
+					</li>
+				</ul>
+			</nav>
 		</main>
 	);
 }

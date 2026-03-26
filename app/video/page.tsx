@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { FileText, Home, MessageSquareText, PlayCircle } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -94,10 +96,10 @@ export default function VideoPage() {
 	}, [activeTab]);
 
 	return (
-		<main className="min-h-screen bg-zinc-100 px-5 pb-10 pt-8 text-zinc-800">
+		<main className="min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
 			<div className="mx-auto w-full max-w-sm">
 				<header>
-					<h1 className="text-3xl font-bold tracking-tight text-zinc-900">복습 영상</h1>
+					<h1 className="text-3xl font-bold tracking-tight text-zinc-900">영상</h1>
 					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
 						{categoryTabs.map((tab) => (
 							<button
@@ -137,40 +139,69 @@ export default function VideoPage() {
 
 					{!isLoading && !errorMessage
 						? videos.map((video) => {
-							const embedUrl = getYoutubeEmbedUrl(video.video_url);
+								const embedUrl = getYoutubeEmbedUrl(video.video_url);
 
-							return (
-								<article
-									key={video.id}
-									className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]"
-								>
-									<div>
-										<h2 className="text-lg font-semibold text-zinc-900">{video.title}</h2>
-										<p className="mt-1 text-sm text-zinc-500">{toKoreanDate(video.created_at)}</p>
-									</div>
+								return (
+									<article
+										key={video.id}
+										className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]"
+									>
+										<div>
+											<h2 className="text-lg font-semibold text-zinc-900">{video.title}</h2>
+											<p className="mt-1 text-sm text-zinc-500">{toKoreanDate(video.created_at)}</p>
+										</div>
 
-									<div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
-										{embedUrl ? (
-											<iframe
-												title={`${video.title} 유튜브 영상`}
-												src={embedUrl}
-												className="aspect-video w-full"
-												allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-												referrerPolicy="strict-origin-when-cross-origin"
-												allowFullScreen
-											/>
-										) : (
-											<div className="flex aspect-video w-full items-center justify-center text-sm text-zinc-500">
-												유효한 유튜브 링크가 아닙니다.
-											</div>
-										)}
-									</div>
-								</article>
-							);
-						})
+										<div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
+											{embedUrl ? (
+												<iframe
+													title={`${video.title} 유튜브 영상`}
+													src={embedUrl}
+													className="aspect-video w-full"
+													allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+													referrerPolicy="strict-origin-when-cross-origin"
+													allowFullScreen
+												/>
+											) : (
+												<div className="flex aspect-video w-full items-center justify-center text-sm text-zinc-500">
+													유효한 유튜브 링크가 아닙니다.
+												</div>
+											)}
+										</div>
+									</article>
+								);
+							})
 						: null}
 				</section>
 			</div>
+
+			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
+				<ul className="mx-auto grid w-full max-w-sm grid-cols-4 gap-2">
+					<li>
+						<Link href="/" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<Home className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>홈</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/video" aria-current="page" className="flex w-full flex-col items-center justify-center rounded-2xl bg-zinc-900 py-2.5 text-xs font-medium text-white shadow-sm transition">
+							<PlayCircle className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>영상</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/material" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<FileText className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>자료</span>
+						</Link>
+					</li>
+					<li>
+						<Link href="/request" className="flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
+							<MessageSquareText className="mb-1 h-5 w-5" strokeWidth={2.1} />
+							<span>요청</span>
+						</Link>
+					</li>
+				</ul>
+			</nav>
 		</main>
 	);
 }
