@@ -6,10 +6,9 @@ import { FileText, Home, MessageSquareText, PlayCircle } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 
 const requestTypes = ["보강영상", "질문", "상담"] as const;
-const statuses = ["접수", "처리중", "완료"] as const;
 
 type RequestType = (typeof requestTypes)[number];
-type RequestStatus = (typeof statuses)[number];
+type RequestStatus = "접수" | "처리중" | "완료";
 
 type StudentRequest = {
 	id: number;
@@ -75,6 +74,7 @@ export default function RequestPage() {
 	};
 
 	useEffect(() => {
+		// eslint-disable-next-line react-hooks/set-state-in-effect
 		fetchRequests();
 	}, []);
 

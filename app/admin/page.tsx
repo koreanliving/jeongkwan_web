@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Link2, MessageSquareText, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { supabase } from "../../utils/supabase";
@@ -45,6 +45,7 @@ type StudentItem = {
 	id: number;
 	student_id: string;
 	name: string;
+	password: string;
 	is_active: boolean;
 	created_at: string;
 };
@@ -67,6 +68,8 @@ type StudentRequestItem = {
 
 type SignupRequestItem = {
 	id: number;
+	student_id: string;
+	password: string;
 	student_name: string;
 	academy: "서정학원" | "다올105" | "라파에듀" | "입시왕";
 	phone: string;
@@ -199,6 +202,9 @@ export default function AdminPage() {
 	const [isProcessingSignupId, setIsProcessingSignupId] = useState<number | null>(null);
 	const [isDeletingSignupId, setIsDeletingSignupId] = useState<number | null>(null);
 	const [isDeletingRequestId, setIsDeletingRequestId] = useState<number | null>(null);
+	const [editingPasswordId, setEditingPasswordId] = useState<number | null>(null);
+	const [editingPassword, setEditingPassword] = useState("");
+	const [isSavingPasswordId, setIsSavingPasswordId] = useState<number | null>(null);
 
 	const selectedMaterial = useMemo(
 		() => materials.find((item) => item.id === selectedMaterialId) ?? null,
@@ -207,7 +213,7 @@ export default function AdminPage() {
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
-	const fetchManagementData = async () => {
+	const fetchManagementData = useCallback(async () => {
 		const [studentsResponse, requestsResponse, signupResponse] = await Promise.all([
 			fetch("/api/admin/students", { cache: "no-store" }),
 			fetch("/api/admin/requests", { cache: "no-store" }),
@@ -241,9 +247,9 @@ export default function AdminPage() {
 			setSignupError("");
 			setSignupRequests(signupResult.signupRequests ?? []);
 		}
-	};
+	}, []);
 
-	const fetchAdminData = async () => {
+	const fetchAdminData = useCallback(async () => {
 		setIsLoadingList(true);
 		setListError("");
 
@@ -283,11 +289,11 @@ export default function AdminPage() {
 		setAnnouncements((announcementResult.data ?? []) as AnnouncementItem[]);
 		await fetchManagementData();
 		setIsLoadingList(false);
-	};
+	}, [fetchManagementData]);
 
 	useEffect(() => {
-		fetchAdminData();
-	}, []);
+		void fetchAdminData();
+	}, [fetchAdminData]);
 
 	const uploadPdfToStorage = async (materialId: number, file: File) => {
 		const cleanedName = safeFileName(file.name);
@@ -638,6 +644,41 @@ export default function AdminPage() {
 		await fetchManagementData();
 	};
 
+	const handleEditPassword = (student: StudentItem) => {
+		setEditingPasswordId(student.id);
+		setEditingPassword("");
+	};
+
+	const handleSavePassword = async (student: StudentItem) => {
+		if (!editingPassword.trim() || editingPassword.length < 6) {
+			setStudentsError("비밀번호는 6자 이상이어야 합니다.");
+			return;
+		}
+
+		setIsSavingPasswordId(student.id);
+		setStudentsError("");
+		setStudentsMessage("");
+
+		const response = await fetch("/api/admin/students", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: student.id, password: editingPassword }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setStudentsError(result.message ?? "비밀번호 변경에 실패했습니다.");
+			setIsSavingPasswordId(null);
+			return;
+		}
+
+		setStudentsMessage("비밀번호가 변경되었습니다.");
+		setIsSavingPasswordId(null);
+		setEditingPasswordId(null);
+		setEditingPassword("");
+		await fetchManagementData();
+	};
+
 	const handleSaveRequest = async (
 		id: number,
 		status: StudentRequestItem["status"],
@@ -679,7 +720,7 @@ export default function AdminPage() {
 		const result = (await response.json()) as {
 			message?: string;
 			studentId?: string;
-			defaultPassword?: string;
+			password?: string;
 		};
 
 		if (!response.ok) {
@@ -689,7 +730,7 @@ export default function AdminPage() {
 		}
 
 		if (action === "approve") {
-			setSignupMessage(`승인 완료: ${result.studentId} / 초기비밀번호 ${result.defaultPassword}`);
+			setSignupMessage(`승인 완료: ${result.studentId} / 초기비밀번호 ${result.password}`);
 		} else {
 			setSignupMessage("가입 신청을 거절 처리했습니다.");
 		}
@@ -947,7 +988,7 @@ export default function AdminPage() {
 							<div className="mt-5 space-y-3">
 								{announcements.map((item) => (
 									<AnnouncementEditor
-										key={item.id}
+										key={`${item.id}-${item.title}-${item.content}`}
 										item={item}
 										onSave={handleUpdateAnnouncement}
 										onDelete={handleDeleteAnnouncement}
@@ -1013,7 +1054,41 @@ export default function AdminPage() {
 										<button type="button" onClick={() => handleDeleteStudent(student)} disabled={isDeletingStudentId === student.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
 											<Trash2 className="h-3.5 w-3.5" />{isDeletingStudentId === student.id ? "삭제 중..." : "삭제"}
 										</button>
+										<button type="button" onClick={() => handleEditPassword(student)} className="inline-flex min-h-9 items-center rounded-lg border border-blue-300 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60">
+											비밀번호 변경
+										</button>
 									</div>
+									{editingPasswordId === student.id ? (
+										<div className="mt-2 flex items-center gap-2">
+											<input
+												type="text"
+												value={editingPassword}
+												onChange={(e) => setEditingPassword(e.target.value)}
+												placeholder="새 비밀번호 (6자 이상)"
+												className="w-40 rounded border border-zinc-300 px-2 py-1 text-xs"
+												disabled={isSavingPasswordId === student.id}
+											/>
+											<button
+												type="button"
+												onClick={() => handleSavePassword(student)}
+												disabled={isSavingPasswordId === student.id}
+												className="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300"
+											>
+												{isSavingPasswordId === student.id ? "저장 중..." : "저장"}
+											</button>
+											<button
+												type="button"
+												onClick={() => {
+													setEditingPasswordId(null);
+													setEditingPassword("");
+												}}
+												disabled={isSavingPasswordId === student.id}
+												className="inline-flex items-center rounded bg-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-400"
+											>
+												취소
+											</button>
+										</div>
+									) : null}
 								</div>
 							))}
 						</div>
@@ -1026,6 +1101,7 @@ export default function AdminPage() {
 								{signupRequests.map((item) => (
 									<div key={item.id} className="rounded-xl border border-zinc-200 bg-white p-3">
 										<p className="text-sm font-semibold text-zinc-900">{item.student_name} · {item.academy}</p>
+										<p className="mt-1 text-xs text-zinc-600">아이디: <span className="font-mono">{item.student_id}</span> · 비밀번호: <span className="font-mono">{item.password}</span></p>
 										<p className="mt-1 text-xs text-zinc-600">연락처: {item.phone} · 학년: {item.grade}</p>
 										<p className="mt-1 text-xs text-zinc-500">최근 모의고사: {item.recent_test || "-"} · 등급: {item.recent_grade || "-"}</p>
 										<p className="mt-1 text-xs text-zinc-500">선택과목: {item.selected_subject || "-"}</p>
@@ -1079,7 +1155,7 @@ export default function AdminPage() {
 						<div className="mt-4 space-y-3">
 							{studentRequests.map((item) => (
 								<RequestEditor
-									key={item.id}
+									key={`${item.id}-${item.status}-${item.admin_reply ?? ""}-${item.support_video_url ?? ""}`}
 									item={item}
 									onSave={handleSaveRequest}
 									onDelete={handleDeleteRequestForAdmin}
@@ -1110,11 +1186,6 @@ function AnnouncementEditor({ item, onSave, onDelete, isSaving, isDeleting }: An
 	const [titleValue, setTitleValue] = useState(item.title || "");
 	const [contentValue, setContentValue] = useState(item.content || "");
 
-	useEffect(() => {
-		setTitleValue(item.title || "");
-		setContentValue(item.content || "");
-	}, [item.id, item.title, item.content]);
-
 	return (
 		<div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
 			<p className="mb-2 text-xs text-zinc-500">{toKoreanDate(item.created_at)}</p>
@@ -1144,12 +1215,6 @@ function RequestEditor({ item, onSave, onDelete, isSaving, isDeleting }: Request
 	const [status, setStatus] = useState<StudentRequestItem["status"]>(item.status);
 	const [adminReply, setAdminReply] = useState(item.admin_reply || "");
 	const [supportVideoUrl, setSupportVideoUrl] = useState(item.support_video_url || "");
-
-	useEffect(() => {
-		setStatus(item.status);
-		setAdminReply(item.admin_reply || "");
-		setSupportVideoUrl(item.support_video_url || "");
-	}, [item.id, item.status, item.admin_reply, item.support_video_url]);
 
 	return (
 		<div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">

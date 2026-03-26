@@ -62,25 +62,37 @@ export async function PATCH(request: NextRequest) {
 	}
 
 	try {
-		const body = (await request.json()) as {
-			id?: number;
-			isActive?: boolean;
-		};
+		   const body = (await request.json()) as {
+			   id?: number;
+			   isActive?: boolean;
+			   password?: string;
+		   };
 
-		if (!body.id || typeof body.isActive !== "boolean") {
-			return NextResponse.json({ message: "수정 파라미터가 올바르지 않습니다." }, { status: 400 });
-		}
+		   if (!body.id) {
+			   return NextResponse.json({ message: "수정 파라미터가 올바르지 않습니다." }, { status: 400 });
+		   }
 
-		const { error } = await supabaseAdmin
-			.from("students")
-			.update({ is_active: body.isActive })
-			.eq("id", body.id);
+		   const updateFields: { is_active?: boolean; password?: string } = {};
+		   if (typeof body.isActive === "boolean") {
+			   updateFields.is_active = body.isActive;
+		   }
+		   if (typeof body.password === "string" && body.password.length > 0) {
+			   updateFields.password = body.password;
+		   }
+		   if (Object.keys(updateFields).length === 0) {
+			   return NextResponse.json({ message: "수정할 값이 없습니다." }, { status: 400 });
+		   }
 
-		if (error) {
-			return NextResponse.json({ message: "학생 상태 수정에 실패했습니다." }, { status: 500 });
-		}
+		   const { error } = await supabaseAdmin
+			   .from("students")
+			   .update(updateFields)
+			   .eq("id", body.id);
 
-		return NextResponse.json({ ok: true });
+		   if (error) {
+			   return NextResponse.json({ message: "학생 정보 수정에 실패했습니다." }, { status: 500 });
+		   }
+
+		   return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
 	}

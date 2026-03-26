@@ -37,12 +37,8 @@ export default function MaterialPage() {
 	const [materials, setMaterials] = useState<MaterialItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
-	const [isAdminUi, setIsAdminUi] = useState(false);
+	const [isAdminUi] = useState(() => (typeof document !== "undefined" ? document.cookie.includes("admin_ui=true") : false));
 	const [showPostDates, setShowPostDates] = useState(true);
-
-	useEffect(() => {
-		setIsAdminUi(document.cookie.includes("admin_ui=true"));
-	}, []);
 
 	useEffect(() => {
 		let isMounted = true;

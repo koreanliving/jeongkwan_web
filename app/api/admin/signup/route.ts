@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
 
 	const { data, error } = await supabaseAdmin
 		.from("signup_requests")
-		.select("id, student_name, academy, phone, grade, recent_test, recent_grade, selected_subject, status, admin_note, created_at, updated_at")
+		.select("id, student_id, password, student_name, academy, phone, grade, recent_test, recent_grade, selected_subject, status, admin_note, created_at, updated_at")
 		.order("created_at", { ascending: false })
 		.limit(500);
 
