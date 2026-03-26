@@ -10,6 +10,7 @@ function isValidAcademy(value: string): boolean {
 export async function POST(request: Request) {
 	try {
 		const body = (await request.json()) as {
+			studentId?: string;
 			studentName?: string;
 			academy?: string;
 			phone?: string;
@@ -19,12 +20,13 @@ export async function POST(request: Request) {
 			selectedSubject?: string | null;
 		};
 
+		const studentId = (body.studentId ?? "").trim();
 		const studentName = (body.studentName ?? "").trim();
 		const academy = (body.academy ?? "").trim();
 		const phone = (body.phone ?? "").trim();
 		const grade = (body.grade ?? "").trim();
 
-		if (!studentName || !academy || !phone || !grade) {
+		if (!studentId || !studentName || !academy || !phone || !grade) {
 			return NextResponse.json(
 				{ message: "필수 입력란을 확인해 주세요." },
 				{ status: 400 }
@@ -46,6 +48,7 @@ export async function POST(request: Request) {
 		}
 
 		const { error } = await supabaseAdmin.from("signup_requests").insert({
+			student_id: studentId,
 			student_name: studentName,
 			academy,
 			phone,

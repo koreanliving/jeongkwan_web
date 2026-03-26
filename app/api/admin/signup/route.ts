@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 		if (body.action === "approve") {
 			const { data: signupData, error: fetchError } = await supabaseAdmin
 				.from("signup_requests")
-				.select("id, student_name, phone")
+				.select("id, student_id, student_name, phone")
 				.eq("id", body.id)
 				.maybeSingle();
 
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 			}
 
 			const defaultPassword = randomUUID().slice(0, 8);
-			const studentId = `user_${Date.now()}`;
+			const studentId = (signupData.student_id ?? '').trim() || `user_${Date.now()}`;
 
 			const { error: insertError } = await supabaseAdmin.from("students").insert({
 				student_id: studentId,

@@ -1,5 +1,6 @@
 create table if not exists public.signup_requests (
   id bigserial primary key,
+  student_id text,
   student_name text not null,
   academy text not null check (academy in ('서정학원', '다올105', '라파에듀', '입시왕')),
   phone text not null,
