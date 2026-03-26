@@ -200,7 +200,7 @@ export default function SignupPage() {
 							type="text"
 							value={selectedSubject}
 							onChange={(event) => setSelectedSubject(event.target.value)}
-							placeholder="화학I, 생명과학I (선택)"
+							placeholder="언어와 매체, 화법과 작문 (선택)"
 							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
 						/>
 					</div>
