@@ -1000,7 +1000,8 @@ export default function AdminPage() {
 						<div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
 							{students.map((student) => (
 								<div key={student.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-									<p className="text-sm font-medium text-zinc-900">{student.name} ({student.student_id})</p>
+									<p className="text-sm font-medium text-zinc-900">{student.name} (<b>{student.student_id}</b>)</p>
+									<p className="mt-0.5 text-xs text-zinc-500">비밀번호: <span className="font-mono">{student.password}</span></p>
 									<p className="mt-0.5 text-xs text-zinc-500">가입일: {toKoreanDate(student.created_at)}</p>
 									<div className="mt-2 flex items-center gap-2">
 										<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${student.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"}`}>

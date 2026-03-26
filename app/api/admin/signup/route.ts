@@ -48,9 +48,11 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 정보를 찾을 수 없습니다." }, { status: 404 });
 			}
 
+
 			const studentId = (signupData.student_id ?? '').trim() || `user_${Date.now()}`;
 			const password = (signupData.password ?? '').trim() || randomUUID().slice(0, 8);
 
+			// 회원이 원하는 비밀번호로 계정 생성
 			const { error: insertError } = await supabaseAdmin.from("students").insert({
 				student_id: studentId,
 				name: signupData.student_name as string,

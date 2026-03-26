@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
 
 	const { data, error } = await supabaseAdmin
 		.from("students")
-		.select("id, student_id, name, is_active, created_at")
+		.select("id, student_id, name, password, is_active, created_at")
 		.order("created_at", { ascending: false });
 
 	if (error) {
