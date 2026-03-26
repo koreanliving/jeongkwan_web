@@ -11,6 +11,7 @@ export async function POST(request: Request) {
 	try {
 		const body = (await request.json()) as {
 			studentId?: string;
+			password?: string;
 			studentName?: string;
 			academy?: string;
 			phone?: string;
@@ -21,12 +22,13 @@ export async function POST(request: Request) {
 		};
 
 		const studentId = (body.studentId ?? "").trim();
+		const password = (body.password ?? "").trim();
 		const studentName = (body.studentName ?? "").trim();
 		const academy = (body.academy ?? "").trim();
 		const phone = (body.phone ?? "").trim();
 		const grade = (body.grade ?? "").trim();
 
-		if (!studentId || !studentName || !academy || !phone || !grade) {
+		if (!studentId || !password || !studentName || !academy || !phone || !grade) {
 			return NextResponse.json(
 				{ message: "필수 입력란을 확인해 주세요." },
 				{ status: 400 }
@@ -49,6 +51,7 @@ export async function POST(request: Request) {
 
 		const { error } = await supabaseAdmin.from("signup_requests").insert({
 			student_id: studentId,
+			password,
 			student_name: studentName,
 			academy,
 			phone,

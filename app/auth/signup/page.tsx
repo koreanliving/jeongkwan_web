@@ -11,6 +11,8 @@ type Academy = (typeof academies)[number];
 
 export default function SignupPage() {
 	const [studentId, setStudentId] = useState("");
+	const [password, setPassword] = useState("");
+	const [passwordConfirm, setPasswordConfirm] = useState("");
 	const [studentName, setStudentName] = useState("");
 	const [academy, setAcademy] = useState<Academy>("서정학원");
 	const [phone, setPhone] = useState("");
@@ -27,8 +29,17 @@ export default function SignupPage() {
 		setError("");
 
 
-		if (!studentId.trim() || !studentName.trim() || !phone.trim()) {
-			setError("아이디, 이름, 연락처는 필수입니다.");
+
+		if (!studentId.trim() || !password.trim() || !passwordConfirm.trim() || !studentName.trim() || !phone.trim()) {
+			setError("아이디, 비밀번호, 이름, 연락처는 필수입니다.");
+			return;
+		}
+		if (password !== passwordConfirm) {
+			setError("비밀번호가 일치하지 않습니다.");
+			return;
+		}
+		if (password.length < 6) {
+			setError("비밀번호는 6자 이상이어야 합니다.");
 			return;
 		}
 
@@ -43,6 +54,7 @@ export default function SignupPage() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				studentId: studentId.trim(),
+				password: password,
 				studentName: studentName.trim(),
 				academy,
 				phone: phone.trim(),
@@ -107,6 +119,40 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="예: honggildong01"
+							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							required
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-zinc-700" htmlFor="password">
+							비밀번호
+						</label>
+						<input
+							id="password"
+							type="password"
+							value={password}
+							onChange={(event) => {
+								setPassword(event.target.value);
+								setError("");
+							}}
+							placeholder="비밀번호 (6자 이상)"
+							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							required
+						/>
+					</div>
+					<div>
+						<label className="block text-sm font-medium text-zinc-700" htmlFor="passwordConfirm">
+							비밀번호 확인
+						</label>
+						<input
+							id="passwordConfirm"
+							type="password"
+							value={passwordConfirm}
+							onChange={(event) => {
+								setPasswordConfirm(event.target.value);
+								setError("");
+							}}
+							placeholder="비밀번호 재입력"
 							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
 							required
 						/>

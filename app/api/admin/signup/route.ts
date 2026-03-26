@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 		if (body.action === "approve") {
 			const { data: signupData, error: fetchError } = await supabaseAdmin
 				.from("signup_requests")
-				.select("id, student_id, student_name, phone")
+				.select("id, student_id, student_name, phone, password")
 				.eq("id", body.id)
 				.maybeSingle();
 
@@ -48,13 +48,13 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 정보를 찾을 수 없습니다." }, { status: 404 });
 			}
 
-			const defaultPassword = randomUUID().slice(0, 8);
 			const studentId = (signupData.student_id ?? '').trim() || `user_${Date.now()}`;
+			const password = (signupData.password ?? '').trim() || randomUUID().slice(0, 8);
 
 			const { error: insertError } = await supabaseAdmin.from("students").insert({
 				student_id: studentId,
 				name: signupData.student_name as string,
-				password: defaultPassword,
+				password,
 				is_active: true,
 			});
 
@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({
 				ok: true,
 				studentId,
-				defaultPassword,
+				password,
 				studentName: signupData.student_name,
 				phone: signupData.phone,
 			});
