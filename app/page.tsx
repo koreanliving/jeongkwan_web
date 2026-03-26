@@ -30,6 +30,7 @@ type HomeSetting = {
 	id: number;
 	welcome_title: string;
 	welcome_subtitle: string;
+	show_post_dates: boolean;
 };
 
 function toKoreanDate(value: string) {
@@ -45,6 +46,7 @@ export default function HomePage() {
 	const [latestMaterials, setLatestMaterials] = useState<MaterialPreviewItem[]>([]);
 	const [welcomeTitle, setWelcomeTitle] = useState("강의실에 오신 것을 환영합니다!");
 	const [welcomeSubtitle, setWelcomeSubtitle] = useState("오늘도 즐거운 배움이 가득한 하루를 시작해 보세요.");
+	const [showPostDates, setShowPostDates] = useState(true);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
 
@@ -66,7 +68,7 @@ export default function HomePage() {
 					.select("id, title, category, created_at")
 					.order("created_at", { ascending: false })
 					.limit(2),
-				supabase.from("home_settings").select("id, welcome_title, welcome_subtitle").eq("id", 1).maybeSingle(),
+				supabase.from("home_settings").select("id, welcome_title, welcome_subtitle, show_post_dates").eq("id", 1).maybeSingle(),
 			]);
 
 			if (!isMounted) {
@@ -88,6 +90,7 @@ export default function HomePage() {
 				const setting = settingResult.data as HomeSetting;
 				setWelcomeTitle(setting.welcome_title || "강의실에 오신 것을 환영합니다!");
 				setWelcomeSubtitle(setting.welcome_subtitle || "오늘도 즐거운 배움이 가득한 하루를 시작해 보세요.");
+				setShowPostDates(setting.show_post_dates ?? true);
 			}
 
 			setIsLoading(false);
@@ -135,7 +138,7 @@ export default function HomePage() {
 								<li key={announcement.id} className="rounded-2xl bg-zinc-100 px-3 py-2.5">
 									<p className="text-sm font-semibold text-zinc-900">{announcement.title || "공지"}</p>
 									<p className="text-sm leading-relaxed text-zinc-800">{announcement.content}</p>
-									<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(announcement.created_at)}</p>
+									{showPostDates ? <p className="mt-1 text-xs text-zinc-500">{toKoreanDate(announcement.created_at)}</p> : null}
 								</li>
 							))}
 						</ul>
@@ -168,7 +171,7 @@ export default function HomePage() {
 									<Link href={`/material/${material.id}`} className="flex items-center justify-between px-3 py-2.5">
 										<div>
 											<p className="text-sm font-medium text-zinc-800">{material.title}</p>
-											<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+											{showPostDates ? <p className="mt-1 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
 										</div>
 										<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
 											{material.category}

@@ -19,6 +19,11 @@ type MaterialItem = {
 	created_at: string;
 };
 
+type HomeSetting = {
+	id: number;
+	show_post_dates: boolean;
+};
+
 function toKoreanDate(value: string) {
 	return new Date(value).toLocaleDateString("ko-KR", {
 		year: "numeric",
@@ -33,6 +38,7 @@ export default function MaterialPage() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
 	const [isAdminUi, setIsAdminUi] = useState(false);
+	const [showPostDates, setShowPostDates] = useState(true);
 
 	useEffect(() => {
 		setIsAdminUi(document.cookie.includes("admin_ui=true"));
@@ -54,7 +60,11 @@ export default function MaterialPage() {
 				query = query.eq("category", activeTab);
 			}
 
-			const { data, error } = await query;
+			const [materialResult, settingResult] = await Promise.all([
+				query,
+				supabase.from("home_settings").select("id, show_post_dates").eq("id", 1).maybeSingle(),
+			]);
+			const { data, error } = materialResult;
 
 			if (!isMounted) {
 				return;
@@ -68,6 +78,10 @@ export default function MaterialPage() {
 			}
 
 			setMaterials((data ?? []) as MaterialItem[]);
+			if (!settingResult.error && settingResult.data) {
+				const setting = settingResult.data as HomeSetting;
+				setShowPostDates(setting.show_post_dates ?? true);
+			}
 			setIsLoading(false);
 		};
 
@@ -152,7 +166,7 @@ export default function MaterialPage() {
 												</span>
 											</div>
 										</div>
-										<p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+										{showPostDates ? <p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
 										<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">
 											{material.subtitle || material.content.trim() || (material.file_name ? "PDF 첨부 자료입니다. 상세 페이지에서 바로 볼 수 있습니다." : "")}
 										</p>

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Home, MessageSquareText, PlayCircle } from "lucide-react";
+import { supabase } from "../../utils/supabase";
 
 const requestTypes = ["보강영상", "질문", "상담"] as const;
 const statuses = ["접수", "처리중", "완료"] as const;
@@ -27,6 +28,11 @@ type RequestResponse = {
 	message?: string;
 };
 
+type HomeSetting = {
+	id: number;
+	show_post_dates: boolean;
+};
+
 function toKoreanDate(value: string) {
 	return new Date(value).toLocaleDateString("ko-KR", {
 		year: "numeric",
@@ -44,6 +50,7 @@ export default function RequestPage() {
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
 	const [deletingId, setDeletingId] = useState<number | null>(null);
+	const [showPostDates, setShowPostDates] = useState(true);
 	const [error, setError] = useState("");
 	const [message, setMessage] = useState("");
 
@@ -69,6 +76,26 @@ export default function RequestPage() {
 
 	useEffect(() => {
 		fetchRequests();
+	}, []);
+
+	useEffect(() => {
+		let isMounted = true;
+		const fetchSetting = async () => {
+			const { data, error } = await supabase
+				.from("home_settings")
+				.select("id, show_post_dates")
+				.eq("id", 1)
+				.maybeSingle();
+
+			if (!isMounted || error || !data) return;
+			const setting = data as HomeSetting;
+			setShowPostDates(setting.show_post_dates ?? true);
+		};
+
+		fetchSetting();
+		return () => {
+			isMounted = false;
+		};
 	}, []);
 
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -189,7 +216,10 @@ export default function RequestPage() {
 							<article key={item.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
 								<div className="flex items-start justify-between gap-2">
 									<div>
-										<p className="text-xs text-zinc-500">{item.request_type} · {toKoreanDate(item.created_at)}</p>
+										<p className="text-xs text-zinc-500">
+											{item.request_type}
+											{showPostDates ? ` · ${toKoreanDate(item.created_at)}` : ""}
+										</p>
 										<h3 className="mt-1 text-sm font-semibold text-zinc-900">{item.title}</h3>
 									</div>
 									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white">{item.status}</span>

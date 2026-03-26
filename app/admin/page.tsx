@@ -38,6 +38,7 @@ type HomeSetting = {
 	id: number;
 	welcome_title: string;
 	welcome_subtitle: string;
+	show_post_dates: boolean;
 };
 
 type StudentItem = {
@@ -166,6 +167,7 @@ export default function AdminPage() {
 
 	const [homeTitle, setHomeTitle] = useState("강의실에 오신 것을 환영합니다!");
 	const [homeSubtitle, setHomeSubtitle] = useState("오늘도 즐거운 배움이 가득한 하루를 시작해 보세요.");
+	const [showPostDates, setShowPostDates] = useState(true);
 	const [isSavingMain, setIsSavingMain] = useState(false);
 	const [mainMessage, setMainMessage] = useState("");
 	const [mainError, setMainError] = useState("");
@@ -257,7 +259,7 @@ export default function AdminPage() {
 				.order("created_at", { ascending: false })
 				.limit(100),
 			supabase.from("announcements").select("id, title, content, created_at").order("created_at", { ascending: false }).limit(30),
-			supabase.from("home_settings").select("id, welcome_title, welcome_subtitle").eq("id", 1).maybeSingle(),
+			supabase.from("home_settings").select("id, welcome_title, welcome_subtitle, show_post_dates").eq("id", 1).maybeSingle(),
 		]);
 
 		if (materialResult.error || videoResult.error || announcementResult.error) {
@@ -273,6 +275,7 @@ export default function AdminPage() {
 			const setting = settingResult.data as HomeSetting;
 			setHomeTitle(setting.welcome_title || "강의실에 오신 것을 환영합니다!");
 			setHomeSubtitle(setting.welcome_subtitle || "오늘도 즐거운 배움이 가득한 하루를 시작해 보세요.");
+			setShowPostDates(setting.show_post_dates ?? true);
 		}
 
 		setMaterials((materialResult.data ?? []) as MaterialItem[]);
@@ -479,7 +482,7 @@ export default function AdminPage() {
 		}
 		setIsSavingMain(true);
 		const { error } = await supabase.from("home_settings").upsert(
-			{ id: 1, welcome_title: homeTitle.trim(), welcome_subtitle: homeSubtitle.trim() },
+			{ id: 1, welcome_title: homeTitle.trim(), welcome_subtitle: homeSubtitle.trim(), show_post_dates: showPostDates },
 			{ onConflict: "id" },
 		);
 		if (error) {
@@ -918,6 +921,10 @@ export default function AdminPage() {
 							<form className="mt-4 space-y-3" onSubmit={handleSaveMainSetting}>
 								<input type="text" value={homeTitle} onChange={(e) => setHomeTitle(e.target.value)} placeholder="강의실에 오신 것을 환영합니다!" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 								<textarea rows={3} value={homeSubtitle} onChange={(e) => setHomeSubtitle(e.target.value)} placeholder="환영 문구 하단 설명" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+								<label className="flex items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-700">
+									<input type="checkbox" checked={showPostDates} onChange={(e) => setShowPostDates(e.target.checked)} className="h-4 w-4" />
+									게시물 날짜 표기 켜기
+								</label>
 								{mainError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{mainError}</p> : null}
 								{mainMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{mainMessage}</p> : null}
 								<button type="submit" disabled={isSavingMain} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">

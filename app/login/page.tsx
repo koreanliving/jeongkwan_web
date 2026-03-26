@@ -84,7 +84,12 @@ export default function LoginPage() {
 					</button>
 				</form>
 
-				<div className="mt-4 text-center">
+				<div className="mt-4 flex flex-col items-center gap-2 text-center">
+					<p className="text-xs text-zinc-500">계정이 없으신가요?</p>
+					<Link href="/auth/signup" className="text-xs font-semibold text-zinc-700 underline underline-offset-2 hover:text-zinc-900">
+						회원가입 요청
+					</Link>
+					<p className="mt-2 text-xs text-zinc-500">또는</p>
 					<Link href="/admin-login" className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">
 						관리자 로그인
 					</Link>

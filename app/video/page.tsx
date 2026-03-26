@@ -17,6 +17,11 @@ type VideoItem = {
 	created_at: string;
 };
 
+type HomeSetting = {
+	id: number;
+	show_post_dates: boolean;
+};
+
 function toKoreanDate(value: string) {
 	return new Date(value).toLocaleDateString("ko-KR", {
 		year: "numeric",
@@ -54,6 +59,7 @@ export default function VideoPage() {
 	const [videos, setVideos] = useState<VideoItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
+	const [showPostDates, setShowPostDates] = useState(true);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -71,7 +77,11 @@ export default function VideoPage() {
 				query = query.eq("category", activeTab);
 			}
 
-			const { data, error } = await query;
+			const [videoResult, settingResult] = await Promise.all([
+				query,
+				supabase.from("home_settings").select("id, show_post_dates").eq("id", 1).maybeSingle(),
+			]);
+			const { data, error } = videoResult;
 
 			if (!isMounted) {
 				return;
@@ -85,6 +95,10 @@ export default function VideoPage() {
 			}
 
 			setVideos((data ?? []) as VideoItem[]);
+			if (!settingResult.error && settingResult.data) {
+				const setting = settingResult.data as HomeSetting;
+				setShowPostDates(setting.show_post_dates ?? true);
+			}
 			setIsLoading(false);
 		};
 
@@ -148,7 +162,7 @@ export default function VideoPage() {
 									>
 										<div>
 											<h2 className="text-lg font-semibold text-zinc-900">{video.title}</h2>
-											<p className="mt-1 text-sm text-zinc-500">{toKoreanDate(video.created_at)}</p>
+											{showPostDates ? <p className="mt-1 text-sm text-zinc-500">{toKoreanDate(video.created_at)}</p> : null}
 										</div>
 
 										<div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">

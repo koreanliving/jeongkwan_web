@@ -20,6 +20,11 @@ type MaterialDetail = {
 	created_at: string;
 };
 
+type HomeSetting = {
+	id: number;
+	show_post_dates: boolean;
+};
+
 function formatFileSize(bytes: number | null) {
 	if (!bytes || bytes <= 0) return "";
 	const mb = bytes / (1024 * 1024);
@@ -58,6 +63,7 @@ export default function MaterialDetailPage() {
 	const [material, setMaterial] = useState<MaterialDetail | null>(null);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
+	const [showPostDates, setShowPostDates] = useState(true);
 
 	const resolvedFileUrl = resolveFileUrl(material?.file_url ?? null);
 	const parsed = useMemo(() => parseStructuredMaterialContent(material?.content ?? ""), [material?.content]);
@@ -77,11 +83,15 @@ export default function MaterialDetailPage() {
 			setIsLoading(true);
 			setErrorMessage("");
 
-			const { data, error } = await supabase
-				.from("materials")
-				.select("id, title, subtitle, content, category, file_url, file_name, file_size, created_at")
-				.eq("id", materialId)
-				.single();
+			const [materialResult, settingResult] = await Promise.all([
+				supabase
+					.from("materials")
+					.select("id, title, subtitle, content, category, file_url, file_name, file_size, created_at")
+					.eq("id", materialId)
+					.single(),
+				supabase.from("home_settings").select("id, show_post_dates").eq("id", 1).maybeSingle(),
+			]);
+			const { data, error } = materialResult;
 
 			if (!isMounted) return;
 			if (error) {
@@ -98,6 +108,10 @@ export default function MaterialDetailPage() {
 			}
 
 			setMaterial(data as MaterialDetail);
+			if (!settingResult.error && settingResult.data) {
+				const setting = settingResult.data as HomeSetting;
+				setShowPostDates(setting.show_post_dates ?? true);
+			}
 			setIsLoading(false);
 		};
 
@@ -124,7 +138,7 @@ export default function MaterialDetailPage() {
 						<header>
 							<div className="flex flex-wrap items-center gap-2">
 								<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">{material.category}</span>
-								<p className="text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p>
+								{showPostDates ? <p className="text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
 							</div>
 							<h1 className="mt-3 break-words text-2xl font-bold leading-tight text-zinc-900 sm:text-3xl">{material.title}</h1>
 							{material.subtitle?.trim() ? <p className="mt-2 text-sm text-zinc-600">{material.subtitle}</p> : null}
