@@ -1,8 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import Link from "next/link";
-import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
+import { BottomTabNav } from "@/components/BottomTabNav";
 import { supabase } from "../../utils/supabase";
 
 const requestTypes = ["보강영상", "질문", "상담"] as const;
@@ -200,7 +199,7 @@ export default function RequestPage() {
 						<button
 							type="submit"
 							disabled={isSubmitting}
-							className="inline-flex min-h-10 items-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+							className="inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 						>
 							{isSubmitting ? "전송 중..." : "요청 보내기"}
 						</button>
@@ -222,7 +221,7 @@ export default function RequestPage() {
 										</p>
 										<h3 className="mt-1 text-sm font-semibold text-zinc-900">{item.title}</h3>
 									</div>
-									<span className="rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-semibold text-white">{item.status}</span>
+									<span className="rounded-full bg-brand px-2.5 py-1 text-xs font-semibold text-white">{item.status}</span>
 								</div>
 								<p className="mt-2 text-sm text-zinc-700">{item.content}</p>
 								{item.admin_reply ? <p className="mt-2 rounded-xl bg-white px-3 py-2 text-sm text-zinc-700">이정관T: {item.admin_reply}</p> : null}
@@ -250,40 +249,7 @@ export default function RequestPage() {
 				</section>
 			</div>
 
-			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1">
-					<li>
-						<Link href="/" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<Home className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>홈</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/video" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<PlayCircle className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>영상</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/material" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<FileText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>자료</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/request" aria-current="page" className="flex w-full flex-col items-center justify-center rounded-2xl bg-zinc-900 py-2 text-[11px] font-medium text-white shadow-sm transition">
-							<MessageSquareText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>요청</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/mypage" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<UserRound className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>마이</span>
-						</Link>
-					</li>
-				</ul>
-			</nav>
+			<BottomTabNav active="request" />
 		</main>
 	);
 }

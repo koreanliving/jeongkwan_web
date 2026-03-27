@@ -10,6 +10,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* 프리미엄 학습 앱 — 포레스트 그린 브랜드 */
+  --color-brand: #2b5b3f;
+  --color-brand-hover: #234a36;
+  --color-brand-active: #1c3d2d;
+  --color-nav-muted: #9ca3af;
 }
 
 @media (prefers-color-scheme: dark) {

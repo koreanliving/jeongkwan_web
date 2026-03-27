@@ -121,10 +121,10 @@ export function ExamTrendChart({ records, className }: ExamTrendChartProps) {
 						<Line
 							type="monotone"
 							dataKey="score"
-							stroke="#18181b"
+							stroke="#2b5b3f"
 							strokeWidth={2}
-							dot={{ r: 4, fill: "#18181b", stroke: "#fff", strokeWidth: 2 }}
-							activeDot={{ r: 6 }}
+							dot={{ r: 4, fill: "#2b5b3f", stroke: "#fff", strokeWidth: 2 }}
+							activeDot={{ r: 6, fill: "#234a36" }}
 						/>
 					</LineChart>
 				</ResponsiveContainer>

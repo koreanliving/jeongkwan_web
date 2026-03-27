@@ -1226,7 +1226,7 @@ export default function AdminPage() {
 								key={tab.key}
 								type="button"
 								onClick={() => setActiveTab(tab.key as AdminTab)}
-								className={`min-h-11 rounded-xl px-3 text-sm font-semibold transition ${activeTab === tab.key ? "bg-zinc-900 text-white" : "text-zinc-600 hover:bg-white/80"}`}
+								className={`min-h-11 rounded-xl px-3 text-sm font-semibold transition ${activeTab === tab.key ? "bg-brand text-white" : "text-zinc-600 hover:bg-white/80"}`}
 							>
 								{tab.label}
 							</button>
@@ -1259,7 +1259,7 @@ export default function AdminPage() {
 									<button type="button" onClick={() => setShowPreview((v) => !v)} className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">
 										{showPreview ? "미리보기 숨기기" : "파싱 미리보기"}
 									</button>
-									<button type="submit" disabled={isCreating} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+									<button type="submit" disabled={isCreating} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
 										<Save className="h-4 w-4" />{isCreating ? "저장 중..." : "자료 저장"}
 									</button>
 								</div>
@@ -1359,7 +1359,7 @@ export default function AdminPage() {
 												<button type="button" onClick={closeMaterialEdit} className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">
 													취소
 												</button>
-												<button type="submit" disabled={isSavingEdit} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+												<button type="submit" disabled={isSavingEdit} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
 													<Save className="h-4 w-4" />{isSavingEdit ? "저장 중..." : "변경 저장"}
 												</button>
 											</div>
@@ -1384,7 +1384,7 @@ export default function AdminPage() {
 								<input type="url" value={videoUrl} onChange={(e) => setVideoUrl(e.target.value)} placeholder="유튜브 링크" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 								{videoError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{videoError}</p> : null}
 								{videoMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{videoMessage}</p> : null}
-								<button type="submit" disabled={isCreatingVideo} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+								<button type="submit" disabled={isCreatingVideo} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
 									<Video className="h-4 w-4" />{isCreatingVideo ? "등록 중..." : "영상 등록"}
 								</button>
 							</form>
@@ -1421,7 +1421,7 @@ export default function AdminPage() {
 								</label>
 								{mainError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{mainError}</p> : null}
 								{mainMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{mainMessage}</p> : null}
-								<button type="submit" disabled={isSavingMain} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+								<button type="submit" disabled={isSavingMain} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
 									<Save className="h-4 w-4" />{isSavingMain ? "저장 중..." : "메인 문구 저장"}
 								</button>
 							</form>
@@ -1434,7 +1434,7 @@ export default function AdminPage() {
 								<textarea rows={3} value={newAnnouncementContent} onChange={(e) => setNewAnnouncementContent(e.target.value)} placeholder="공지 내용" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 								{announcementError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{announcementError}</p> : null}
 								{announcementMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{announcementMessage}</p> : null}
-								<button type="submit" disabled={isCreatingAnnouncement} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+								<button type="submit" disabled={isCreatingAnnouncement} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
 									<Save className="h-4 w-4" />{isCreatingAnnouncement ? "등록 중..." : "공지 등록"}
 								</button>
 							</form>
@@ -1498,7 +1498,7 @@ export default function AdminPage() {
 								placeholder="연락처"
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500 sm:col-span-2"
 							/>
-							<button type="submit" disabled={isCreatingStudent} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400 sm:col-span-2">
+							<button type="submit" disabled={isCreatingStudent} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2">
 								{isCreatingStudent ? "추가 중..." : "학생 계정 추가 (Auth + 프로필)"}
 							</button>
 						</form>
@@ -1740,7 +1740,7 @@ export default function AdminPage() {
 														<button
 															type="submit"
 															disabled={detailSavingExamId === row.id}
-															className="rounded-lg bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+															className="rounded-lg bg-brand px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:opacity-45"
 														>
 															{detailSavingExamId === row.id ? "저장 중…" : "저장"}
 														</button>
@@ -1815,7 +1815,7 @@ export default function AdminPage() {
 									<button
 										type="submit"
 										disabled={detailExamSubmitting}
-										className="inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+										className="inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 									>
 										{detailExamSubmitting ? "등록 중…" : "성적 등록"}
 									</button>
@@ -1864,7 +1864,7 @@ export default function AdminPage() {
 									<button
 										type="submit"
 										disabled={memoSubmitting}
-										className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+										className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 									>
 										<MessageSquareText className="h-3.5 w-3.5" />
 										{memoSubmitting ? "등록 중…" : "메모 추가"}

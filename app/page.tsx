@@ -2,16 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
 import { supabase } from "../utils/supabase";
-
-const navItems = [
-	{ label: "홈", href: "/", icon: Home, active: true },
-	{ label: "영상", href: "/video", icon: PlayCircle, active: false },
-	{ label: "자료", href: "/material", icon: FileText, active: false },
-	{ label: "요청", href: "/request", icon: MessageSquareText, active: false },
-	{ label: "마이", href: "/mypage", icon: UserRound, active: false },
-];
+import { BottomTabNav } from "@/components/BottomTabNav";
 
 type AnnouncementItem = {
 	id: number;
@@ -174,7 +166,7 @@ export default function HomePage() {
 											<p className="text-sm font-medium text-zinc-800">{material.title}</p>
 											{showPostDates ? <p className="mt-1 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
 										</div>
-										<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">
+										<span className="shrink-0 whitespace-nowrap rounded-full bg-brand px-2.5 py-1 text-xs font-medium leading-none text-white">
 											{material.category}
 										</span>
 									</Link>
@@ -185,26 +177,7 @@ export default function HomePage() {
 				</section>
 			</div>
 
-			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1">
-					{navItems.map(({ label, href, icon: Icon, active }) => (
-						<li key={label}>
-							<Link
-								href={href}
-								className={`flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium transition ${
-									active
-										? "bg-zinc-900 text-white shadow-sm"
-										: "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
-								}`}
-								aria-current={active ? "page" : undefined}
-							>
-								<Icon className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-								<span>{label}</span>
-							</Link>
-						</li>
-					))}
-				</ul>
-			</nav>
+			<BottomTabNav active="home" />
 		</main>
 	);
 }

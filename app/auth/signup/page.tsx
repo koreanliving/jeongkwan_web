@@ -94,7 +94,7 @@ export default function SignupPage() {
 					</p>
 					<Link
 						href="/login"
-						className="mt-6 block rounded-2xl bg-zinc-900 px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-zinc-800"
+						className="mt-6 block rounded-2xl bg-brand px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
 					>
 						로그인 페이지로 돌아가기
 					</Link>
@@ -285,7 +285,7 @@ export default function SignupPage() {
 					<button
 						type="submit"
 						disabled={isSubmitting}
-						className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-400"
+						className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 					>
 						{isSubmitting ? "신청 중..." : "가입 신청하기"}
 					</button>

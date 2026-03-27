@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Home, MessageSquareText, Pencil, PlayCircle, Trash2, UserRound } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
+import { BottomTabNav } from "@/components/BottomTabNav";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import { supabase } from "@/utils/supabase";
@@ -286,7 +287,7 @@ export default function MyPage() {
 						<p className="text-sm text-zinc-600">성적을 보려면 학생 로그인이 필요합니다.</p>
 						<Link
 							href="/login"
-							className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700"
+							className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
 						>
 							로그인하기
 						</Link>
@@ -349,7 +350,7 @@ export default function MyPage() {
 								<button
 									type="submit"
 									disabled={isSubmitting}
-									className="inline-flex min-h-10 items-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+									className="inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 								>
 									{isSubmitting ? "등록 중..." : "성적 등록"}
 								</button>
@@ -391,7 +392,7 @@ export default function MyPage() {
 													<button
 														type="submit"
 														disabled={savingRecordId === row.id}
-														className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+														className="rounded-xl bg-brand px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:opacity-45"
 													>
 														{savingRecordId === row.id ? "저장 중…" : "저장"}
 													</button>
@@ -449,56 +450,7 @@ export default function MyPage() {
 				) : null}
 			</div>
 
-			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1">
-					<li>
-						<Link
-							href="/"
-							className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
-						>
-							<Home className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>홈</span>
-						</Link>
-					</li>
-					<li>
-						<Link
-							href="/video"
-							className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
-						>
-							<PlayCircle className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>영상</span>
-						</Link>
-					</li>
-					<li>
-						<Link
-							href="/material"
-							className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
-						>
-							<FileText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>자료</span>
-						</Link>
-					</li>
-					<li>
-						<Link
-							href="/request"
-							className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700"
-						>
-							<MessageSquareText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>요청</span>
-						</Link>
-					</li>
-					<li>
-						<Link
-							href="/mypage"
-							aria-current="page"
-							className="flex w-full flex-col items-center justify-center rounded-2xl bg-zinc-900 py-2 text-[11px] font-medium text-white shadow-sm transition"
-						>
-							<UserRound className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>마이</span>
-						</Link>
-					</li>
-				</ul>
-			</nav>
+			<BottomTabNav active="mypage" />
 		</main>
 	);
 }

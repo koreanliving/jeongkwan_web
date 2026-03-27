@@ -137,7 +137,7 @@ export default function MaterialDetailPage() {
 					<article className="rounded-3xl border border-zinc-200 bg-white p-4 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] sm:p-6">
 						<header>
 							<div className="flex flex-wrap items-center gap-2">
-								<span className="shrink-0 whitespace-nowrap rounded-full bg-zinc-900 px-2.5 py-1 text-xs font-medium leading-none text-white">{material.category}</span>
+								<span className="shrink-0 whitespace-nowrap rounded-full bg-brand px-2.5 py-1 text-xs font-medium leading-none text-white">{material.category}</span>
 								{showPostDates ? <p className="text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
 							</div>
 							<h1 className="mt-3 break-words text-2xl font-bold leading-tight text-zinc-900 sm:text-3xl">{material.title}</h1>
@@ -214,7 +214,7 @@ export default function MaterialDetailPage() {
 										<p className="text-sm font-medium text-zinc-800">{material.file_name ?? "첨부파일"}</p>
 										<p className="mt-1 text-xs text-zinc-500">{material.file_size ? formatFileSize(material.file_size) : ""}</p>
 									</div>
-									<a href={createDownloadUrl(resolvedFileUrl, material.file_name)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-zinc-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-zinc-700 sm:text-sm">
+									<a href={createDownloadUrl(resolvedFileUrl, material.file_name)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-brand px-3 py-2 text-xs font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active sm:text-sm">
 										<Download className="h-4 w-4" />다운로드
 									</a>
 								</div>

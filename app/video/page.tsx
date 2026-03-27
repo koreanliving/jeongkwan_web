@@ -1,8 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
+import { BottomTabNav } from "@/components/BottomTabNav";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -122,7 +121,7 @@ export default function VideoPage() {
 								onClick={() => setActiveTab(tab)}
 								className={`min-h-11 rounded-xl px-3 text-sm font-semibold transition ${
 									activeTab === tab
-										? "bg-zinc-900 text-white shadow-sm"
+										? "bg-brand text-white shadow-sm"
 										: "bg-transparent text-zinc-600 hover:bg-white/80"
 								}`}
 							>
@@ -188,40 +187,7 @@ export default function VideoPage() {
 				</section>
 			</div>
 
-			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1">
-					<li>
-						<Link href="/" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<Home className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>홈</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/video" aria-current="page" className="flex w-full flex-col items-center justify-center rounded-2xl bg-zinc-900 py-2 text-[11px] font-medium text-white shadow-sm transition">
-							<PlayCircle className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>영상</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/material" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<FileText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>자료</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/request" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<MessageSquareText className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>요청</span>
-						</Link>
-					</li>
-					<li>
-						<Link href="/mypage" className="flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-700">
-							<UserRound className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
-							<span>마이</span>
-						</Link>
-					</li>
-				</ul>
-			</nav>
+			<BottomTabNav active="video" />
 		</main>
 	);
 }

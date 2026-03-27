@@ -61,7 +61,7 @@ export default function AdminLoginPage() {
 					<button
 						type="submit"
 						disabled={isSubmitting}
-						className="w-full rounded-2xl bg-zinc-900 px-4 py-3 text-sm font-semibold text-white transition hover:bg-zinc-800"
+						className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
 					>
 						{isSubmitting ? "확인 중..." : "관리자 로그인"}
 					</button>
