@@ -1,52 +1,41 @@
-import { NextRequest } from "next/server";
+import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "./supabaseAdmin";
-
-const STUDENT_AUTH_COOKIE_NAME = "student_auth";
+import { createSupabaseAuthReader } from "./supabaseAuthCookies";
 
 export type StudentSession = {
-	sessionId: number;
-	studentDbId: number;
-	studentId: string;
-	studentName: string;
+	/** `profiles.id` (= `auth.users.id`) */
+	userId: string;
+	username: string;
+	name: string;
 };
 
+/**
+ * 승인된 학생만 세션으로 인정합니다. (미승인 계정은 JWT가 있어도 null)
+ */
 export async function getStudentSession(request: NextRequest): Promise<StudentSession | null> {
-	const sessionToken = request.cookies.get(STUDENT_AUTH_COOKIE_NAME)?.value;
-	if (!sessionToken || sessionToken === "true") {
+	const supabase = createSupabaseAuthReader(request);
+	const {
+		data: { user },
+		error: authError,
+	} = await supabase.auth.getUser();
+	if (authError || !user) {
 		return null;
 	}
 
-	const { data: sessionRow, error: sessionError } = await supabaseAdmin
-		.from("student_sessions")
-		.select("id, student_id, expires_at")
-		.eq("session_token", sessionToken)
+	const { data: profile, error: profileError } = await supabaseAdmin
+		.from("profiles")
+		.select("username, name, is_approved")
+		.eq("id", user.id)
 		.maybeSingle();
 
-	if (sessionError || !sessionRow) {
-		return null;
-	}
-
-	const expiresAt = new Date(sessionRow.expires_at);
-	if (Number.isNaN(expiresAt.getTime()) || expiresAt.getTime() < Date.now()) {
-		await supabaseAdmin.from("student_sessions").delete().eq("id", sessionRow.id);
-		return null;
-	}
-
-	const { data: studentRow, error: studentError } = await supabaseAdmin
-		.from("students")
-		.select("id, student_id, name, is_active")
-		.eq("id", sessionRow.student_id)
-		.maybeSingle();
-
-	if (studentError || !studentRow || !studentRow.is_active) {
+	if (profileError || !profile || !profile.is_approved) {
 		return null;
 	}
 
 	return {
-		sessionId: sessionRow.id as number,
-		studentDbId: studentRow.id as number,
-		studentId: studentRow.student_id as string,
-		studentName: studentRow.name as string,
+		userId: user.id,
+		username: profile.username as string,
+		name: profile.name as string,
 	};
 }
 

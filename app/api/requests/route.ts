@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 	const { data, error } = await supabaseAdmin
 		.from("student_requests")
 		.select("id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at")
-		.eq("student_id", session.studentDbId)
+		.eq("student_id", session.userId)
 		.eq("is_deleted", false)
 		.order("created_at", { ascending: false });
 
@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
 	}
 
 	return NextResponse.json({
-		student: { id: session.studentId, name: session.studentName },
+		student: { id: session.username, name: session.name },
+		userId: session.userId,
 		requests: data ?? [],
 	});
 }
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
 		}
 
 		const { error } = await supabaseAdmin.from("student_requests").insert({
-			student_id: session.studentDbId,
+			student_id: session.userId,
 			request_type: requestType,
 			title,
 			content,
@@ -90,7 +91,7 @@ export async function DELETE(request: NextRequest) {
 			.eq("id", body.id)
 			.maybeSingle();
 
-		if (fetchError || !requestData || requestData.student_id !== session.studentDbId) {
+		if (fetchError || !requestData || requestData.student_id !== session.userId) {
 			return NextResponse.json({ message: "요청을 찾을 수 없습니다." }, { status: 404 });
 		}
 

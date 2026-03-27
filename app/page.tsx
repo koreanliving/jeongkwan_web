@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Home, MessageSquareText, PlayCircle } from "lucide-react";
+import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
 import { supabase } from "../utils/supabase";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
 	{ label: "영상", href: "/video", icon: PlayCircle, active: false },
 	{ label: "자료", href: "/material", icon: FileText, active: false },
 	{ label: "요청", href: "/request", icon: MessageSquareText, active: false },
+	{ label: "마이", href: "/mypage", icon: UserRound, active: false },
 ];
 
 type AnnouncementItem = {
@@ -184,20 +185,20 @@ export default function HomePage() {
 				</section>
 			</div>
 
-			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
-				<ul className="mx-auto grid w-full max-w-sm grid-cols-4 gap-2">
+			<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200 bg-white/95 px-3 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-3 backdrop-blur-md">
+				<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1">
 					{navItems.map(({ label, href, icon: Icon, active }) => (
 						<li key={label}>
 							<Link
 								href={href}
-								className={`flex w-full flex-col items-center justify-center rounded-2xl py-2.5 text-xs font-medium transition ${
+								className={`flex w-full flex-col items-center justify-center rounded-2xl py-2 text-[11px] font-medium transition ${
 									active
 										? "bg-zinc-900 text-white shadow-sm"
 										: "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700"
 								}`}
 								aria-current={active ? "page" : undefined}
 							>
-								<Icon className="mb-1 h-5 w-5" strokeWidth={2.1} />
+								<Icon className="mb-0.5 h-5 w-5" strokeWidth={2.1} />
 								<span>{label}</span>
 							</Link>
 						</li>

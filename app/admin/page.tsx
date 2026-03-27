@@ -2,7 +2,8 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { ClipboardList, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
 import { supabase } from "../../utils/supabase";
 import { parseStructuredMaterialContent } from "../../utils/materialParser";
 
@@ -42,17 +43,18 @@ type HomeSetting = {
 };
 
 type StudentItem = {
-	id: number;
-	student_id: string;
+	id: string;
+	username: string;
 	name: string;
-	password: string;
-	is_active: boolean;
+	academy: string;
+	phone: string;
+	is_approved: boolean;
 	created_at: string;
 };
 
 type StudentRequestItem = {
 	id: number;
-	student_id: number;
+	student_id: string;
 	student_code: string;
 	student_name: string;
 	request_type: "보강영상" | "질문" | "상담";
@@ -201,16 +203,30 @@ export default function AdminPage() {
 	const [newStudentId, setNewStudentId] = useState("");
 	const [newStudentName, setNewStudentName] = useState("");
 	const [newStudentPassword, setNewStudentPassword] = useState("");
+	const [newStudentAcademy, setNewStudentAcademy] = useState("");
+	const [newStudentPhone, setNewStudentPhone] = useState("");
 	const [isCreatingStudent, setIsCreatingStudent] = useState(false);
-	const [isUpdatingStudentId, setIsUpdatingStudentId] = useState<number | null>(null);
-	const [isDeletingStudentId, setIsDeletingStudentId] = useState<number | null>(null);
+	const [isApprovingStudentId, setIsApprovingStudentId] = useState<string | null>(null);
+	const [isDeletingStudentId, setIsDeletingStudentId] = useState<string | null>(null);
 	const [isSavingRequestId, setIsSavingRequestId] = useState<number | null>(null);
 	const [isProcessingSignupId, setIsProcessingSignupId] = useState<number | null>(null);
 	const [isDeletingSignupId, setIsDeletingSignupId] = useState<number | null>(null);
 	const [isDeletingRequestId, setIsDeletingRequestId] = useState<number | null>(null);
-	const [editingPasswordId, setEditingPasswordId] = useState<number | null>(null);
-	const [editingPassword, setEditingPassword] = useState("");
-	const [isSavingPasswordId, setIsSavingPasswordId] = useState<number | null>(null);
+
+	const [studentDetailModal, setStudentDetailModal] = useState<StudentItem | null>(null);
+	const [detailExamRecords, setDetailExamRecords] = useState<ExamRecord[]>([]);
+	const [detailMemos, setDetailMemos] = useState<Memo[]>([]);
+	const [detailLoading, setDetailLoading] = useState(false);
+	const [detailExamError, setDetailExamError] = useState("");
+	const [detailMemoError, setDetailMemoError] = useState("");
+	const [memoNewContent, setMemoNewContent] = useState("");
+	const [memoSubmitting, setMemoSubmitting] = useState(false);
+	const [memoFormError, setMemoFormError] = useState("");
+	const [memoFormMessage, setMemoFormMessage] = useState("");
+	const [modalResetPassword, setModalResetPassword] = useState("");
+	const [modalPasswordError, setModalPasswordError] = useState("");
+	const [modalPasswordMessage, setModalPasswordMessage] = useState("");
+	const [isSavingModalPassword, setIsSavingModalPassword] = useState(false);
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
@@ -641,9 +657,12 @@ export default function AdminPage() {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				studentId: newStudentId,
-				name: newStudentName,
+				studentId: newStudentId.trim(),
+				name: newStudentName.trim(),
 				password: newStudentPassword,
+				academy: newStudentAcademy.trim() || "-",
+				phone: newStudentPhone.trim().replace(/[-\s]/g, "") || "-",
+				isApproved: true,
 			}),
 		});
 
@@ -657,36 +676,38 @@ export default function AdminPage() {
 		setNewStudentId("");
 		setNewStudentName("");
 		setNewStudentPassword("");
-		setStudentsMessage("학생 계정이 추가되었습니다.");
+		setNewStudentAcademy("");
+		setNewStudentPhone("");
+		setStudentsMessage("학생 계정이 추가되었습니다. (Supabase Auth + 프로필)");
 		setIsCreatingStudent(false);
 		await fetchManagementData();
 	};
 
-	const handleToggleStudent = async (student: StudentItem) => {
+	const handleApproveStudent = async (student: StudentItem) => {
 		setStudentsError("");
 		setStudentsMessage("");
-		setIsUpdatingStudentId(student.id);
+		setIsApprovingStudentId(student.id);
 
 		const response = await fetch("/api/admin/students", {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ id: student.id, isActive: !student.is_active }),
+			body: JSON.stringify({ id: student.id, isApproved: true }),
 		});
 
 		const result = (await response.json()) as { message?: string };
 		if (!response.ok) {
-			setStudentsError(result.message ?? "학생 상태 변경에 실패했습니다.");
-			setIsUpdatingStudentId(null);
+			setStudentsError(result.message ?? "승인 처리에 실패했습니다.");
+			setIsApprovingStudentId(null);
 			return;
 		}
 
-		setStudentsMessage(!student.is_active ? "학생 계정을 활성화했습니다." : "학생 계정을 비활성화했습니다.");
-		setIsUpdatingStudentId(null);
+		setStudentsMessage("학생 계정을 승인했습니다.");
+		setIsApprovingStudentId(null);
 		await fetchManagementData();
 	};
 
 	const handleDeleteStudent = async (student: StudentItem) => {
-		if (!window.confirm(`정말 삭제할까요?\n${student.name} (${student.student_id})`)) return;
+		if (!window.confirm(`정말 삭제할까요?\nAuth 계정과 프로필이 함께 삭제됩니다.\n${student.name} (${student.username})`)) return;
 		setStudentsError("");
 		setStudentsMessage("");
 		setIsDeletingStudentId(student.id);
@@ -706,42 +727,124 @@ export default function AdminPage() {
 
 		setStudentsMessage("학생 계정을 삭제했습니다.");
 		setIsDeletingStudentId(null);
+		if (studentDetailModal?.id === student.id) {
+			setStudentDetailModal(null);
+		}
 		await fetchManagementData();
 	};
 
-	const handleEditPassword = (student: StudentItem) => {
-		setEditingPasswordId(student.id);
-		setEditingPassword("");
+	const closeStudentDetailModal = () => {
+		setStudentDetailModal(null);
+		setDetailExamRecords([]);
+		setDetailMemos([]);
+		setDetailLoading(false);
+		setDetailExamError("");
+		setDetailMemoError("");
+		setMemoNewContent("");
+		setMemoFormError("");
+		setMemoFormMessage("");
+		setModalResetPassword("");
+		setModalPasswordError("");
+		setModalPasswordMessage("");
 	};
 
-	const handleSavePassword = async (student: StudentItem) => {
-		if (!editingPassword.trim() || editingPassword.length < 6) {
-			setStudentsError("비밀번호는 6자 이상이어야 합니다.");
+	const openStudentDetailModal = async (student: StudentItem) => {
+		setStudentDetailModal(student);
+		setDetailLoading(true);
+		setDetailExamError("");
+		setDetailMemoError("");
+		setMemoFormError("");
+		setMemoFormMessage("");
+		setModalResetPassword("");
+		setModalPasswordError("");
+		setModalPasswordMessage("");
+		setDetailExamRecords([]);
+		setDetailMemos([]);
+
+		const sid = encodeURIComponent(student.id);
+		const [exRes, memRes] = await Promise.all([
+			fetch(`/api/exam-records?studentId=${sid}`, { cache: "no-store" }),
+			fetch(`/api/memos?studentId=${sid}`, { cache: "no-store" }),
+		]);
+		const exJson = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
+		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
+
+		setDetailLoading(false);
+
+		if (!exRes.ok) {
+			setDetailExamError(exJson.message ?? "성적을 불러오지 못했습니다.");
+			setDetailExamRecords([]);
+		} else {
+			setDetailExamRecords(exJson.records ?? []);
+		}
+
+		if (!memRes.ok) {
+			setDetailMemoError(memJson.message ?? "메모를 불러오지 못했습니다.");
+			setDetailMemos([]);
+		} else {
+			setDetailMemos(memJson.memos ?? []);
+		}
+	};
+
+	const handleAddStudentMemo = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!studentDetailModal) return;
+		setMemoFormError("");
+		setMemoFormMessage("");
+		const text = memoNewContent.trim();
+		if (!text) {
+			setMemoFormError("메모 내용을 입력해 주세요.");
 			return;
 		}
 
-		setIsSavingPasswordId(student.id);
-		setStudentsError("");
-		setStudentsMessage("");
+		setMemoSubmitting(true);
+		const res = await fetch("/api/memos", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ studentId: studentDetailModal.id, content: text }),
+		});
+		const json = (await res.json()) as { message?: string };
+		setMemoSubmitting(false);
 
+		if (!res.ok) {
+			setMemoFormError(json.message ?? "메모 등록에 실패했습니다.");
+			return;
+		}
+
+		setMemoNewContent("");
+		setMemoFormMessage("메모가 등록되었습니다.");
+
+		const memRes = await fetch(`/api/memos?studentId=${encodeURIComponent(studentDetailModal.id)}`, { cache: "no-store" });
+		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
+		if (memRes.ok) {
+			setDetailMemos(memJson.memos ?? []);
+			setDetailMemoError("");
+		}
+	};
+
+	const handleModalPasswordReset = async () => {
+		if (!studentDetailModal) return;
+		setModalPasswordError("");
+		setModalPasswordMessage("");
+		const pw = modalResetPassword.trim();
+		if (pw.length < 6) {
+			setModalPasswordError("비밀번호는 6자 이상이어야 합니다.");
+			return;
+		}
+		setIsSavingModalPassword(true);
 		const response = await fetch("/api/admin/students", {
 			method: "PATCH",
 			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ id: student.id, password: editingPassword }),
+			body: JSON.stringify({ id: studentDetailModal.id, password: pw }),
 		});
 		const result = (await response.json()) as { message?: string };
-
+		setIsSavingModalPassword(false);
 		if (!response.ok) {
-			setStudentsError(result.message ?? "비밀번호 변경에 실패했습니다.");
-			setIsSavingPasswordId(null);
+			setModalPasswordError(result.message ?? "비밀번호 변경에 실패했습니다.");
 			return;
 		}
-
-		setStudentsMessage("비밀번호가 변경되었습니다.");
-		setIsSavingPasswordId(null);
-		setEditingPasswordId(null);
-		setEditingPassword("");
-		await fetchManagementData();
+		setModalResetPassword("");
+		setModalPasswordMessage("비밀번호가 변경되었습니다.");
 	};
 
 	const handleSaveRequest = async (
@@ -1111,12 +1214,13 @@ export default function AdminPage() {
 							<h2 className="text-lg font-semibold text-zinc-900">학생 회원관리</h2>
 						</div>
 
-						<form className="mt-4 grid gap-2 sm:grid-cols-3" onSubmit={handleCreateStudent}>
+						<p className="mt-2 text-xs text-zinc-500">로그인 이메일: <span className="font-mono">아이디@도메인</span> (도메인은 환경변수 NEXT_PUBLIC_STUDENT_AUTH_EMAIL_DOMAIN, 기본 myapp.com)</p>
+						<form className="mt-4 grid gap-2 sm:grid-cols-2" onSubmit={handleCreateStudent}>
 							<input
 								type="text"
 								value={newStudentId}
 								onChange={(e) => setNewStudentId(e.target.value)}
-								placeholder="학생 아이디"
+								placeholder="학생 아이디 (username)"
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
 							/>
 							<input
@@ -1130,11 +1234,25 @@ export default function AdminPage() {
 								type="text"
 								value={newStudentPassword}
 								onChange={(e) => setNewStudentPassword(e.target.value)}
-								placeholder="비밀번호"
+								placeholder="초기 비밀번호 (Auth에만 저장)"
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
 							/>
-							<button type="submit" disabled={isCreatingStudent} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400 sm:col-span-3">
-								{isCreatingStudent ? "추가 중..." : "학생 계정 추가"}
+							<input
+								type="text"
+								value={newStudentAcademy}
+								onChange={(e) => setNewStudentAcademy(e.target.value)}
+								placeholder="학원"
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+							/>
+							<input
+								type="text"
+								value={newStudentPhone}
+								onChange={(e) => setNewStudentPhone(e.target.value)}
+								placeholder="연락처"
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500 sm:col-span-2"
+							/>
+							<button type="submit" disabled={isCreatingStudent} className="inline-flex min-h-10 items-center justify-center rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400 sm:col-span-2">
+								{isCreatingStudent ? "추가 중..." : "학생 계정 추가 (Auth + 프로필)"}
 							</button>
 						</form>
 
@@ -1144,54 +1262,41 @@ export default function AdminPage() {
 						<div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
 							{students.map((student) => (
 								<div key={student.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
-									<p className="text-sm font-medium text-zinc-900">{student.name} (<b>{student.student_id}</b>)</p>
-									<p className="mt-0.5 text-xs text-zinc-500">비밀번호: <span className="font-mono">{student.password}</span></p>
-									<p className="mt-0.5 text-xs text-zinc-500">가입일: {toKoreanDate(student.created_at)}</p>
-									<div className="mt-2 flex items-center gap-2">
-										<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${student.is_active ? "bg-emerald-100 text-emerald-700" : "bg-zinc-200 text-zinc-600"}`}>
-											{student.is_active ? "활성" : "비활성"}
+									<button
+										type="button"
+										onClick={() => void openStudentDetailModal(student)}
+										className="w-full rounded-lg border border-transparent p-1 text-left outline-none ring-zinc-400 transition hover:border-zinc-200 hover:bg-white focus-visible:ring-2"
+									>
+										<div className="flex items-start justify-between gap-2">
+											<div>
+												<p className="text-sm font-medium text-zinc-900">{student.name} (<b>{student.username}</b>)</p>
+												<p className="mt-0.5 text-xs text-zinc-500">{student.academy} · {student.phone}</p>
+												<p className="mt-0.5 text-xs text-zinc-500">가입일: {toKoreanDate(student.created_at)}</p>
+											</div>
+											<span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-zinc-200/80 px-2 py-1 text-[10px] font-semibold text-zinc-600">
+												<ClipboardList className="h-3 w-3" />
+												상세
+											</span>
+										</div>
+									</button>
+									<div className="mt-2 flex flex-wrap items-center gap-2">
+										<span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${student.is_approved ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>
+											{student.is_approved ? "승인됨" : "승인 대기"}
 										</span>
-										<button type="button" onClick={() => handleToggleStudent(student)} disabled={isUpdatingStudentId === student.id} className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60">
-											{isUpdatingStudentId === student.id ? "처리 중..." : student.is_active ? "비활성화" : "활성화"}
-										</button>
-										<button type="button" onClick={() => handleDeleteStudent(student)} disabled={isDeletingStudentId === student.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
-											<Trash2 className="h-3.5 w-3.5" />{isDeletingStudentId === student.id ? "삭제 중..." : "삭제"}
-										</button>
-										<button type="button" onClick={() => handleEditPassword(student)} className="inline-flex min-h-9 items-center rounded-lg border border-blue-300 bg-white px-3 text-xs font-semibold text-blue-700 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60">
-											비밀번호 변경
+										{!student.is_approved ? (
+											<button
+												type="button"
+												onClick={() => void handleApproveStudent(student)}
+												disabled={isApprovingStudentId === student.id}
+												className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 bg-white px-3 text-xs font-semibold text-emerald-800 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isApprovingStudentId === student.id ? "처리 중..." : "승인"}
+											</button>
+										) : null}
+										<button type="button" onClick={() => void handleDeleteStudent(student)} disabled={isDeletingStudentId === student.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+											<Trash2 className="h-3.5 w-3.5" />{isDeletingStudentId === student.id ? "삭제 중..." : "삭제 (Auth+프로필)"}
 										</button>
 									</div>
-									{editingPasswordId === student.id ? (
-										<div className="mt-2 flex items-center gap-2">
-											<input
-												type="text"
-												value={editingPassword}
-												onChange={(e) => setEditingPassword(e.target.value)}
-												placeholder="새 비밀번호 (6자 이상)"
-												className="w-40 rounded border border-zinc-300 px-2 py-1 text-xs"
-												disabled={isSavingPasswordId === student.id}
-											/>
-											<button
-												type="button"
-												onClick={() => handleSavePassword(student)}
-												disabled={isSavingPasswordId === student.id}
-												className="inline-flex items-center rounded bg-blue-600 px-3 py-1 text-xs font-semibold text-white hover:bg-blue-700 disabled:bg-blue-300"
-											>
-												{isSavingPasswordId === student.id ? "저장 중..." : "저장"}
-											</button>
-											<button
-												type="button"
-												onClick={() => {
-													setEditingPasswordId(null);
-													setEditingPassword("");
-												}}
-												disabled={isSavingPasswordId === student.id}
-												className="inline-flex items-center rounded bg-zinc-300 px-3 py-1 text-xs font-semibold text-zinc-700 hover:bg-zinc-400"
-											>
-												취소
-											</button>
-										</div>
-									) : null}
 								</div>
 							))}
 						</div>
@@ -1269,6 +1374,152 @@ export default function AdminPage() {
 							{studentRequests.length === 0 ? <p className="text-sm text-zinc-500">접수된 요청이 없습니다.</p> : null}
 						</div>
 					</section>
+				) : null}
+
+				{studentDetailModal !== null ? (
+					<div
+						className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+						role="dialog"
+						aria-modal="true"
+						aria-labelledby="student-detail-title"
+						onClick={closeStudentDetailModal}
+					>
+						<div
+							className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]"
+							onClick={(e) => e.stopPropagation()}
+						>
+							<div className="flex items-start justify-between gap-3">
+								<div>
+									<h2 id="student-detail-title" className="text-lg font-semibold text-zinc-900">
+										{studentDetailModal.name}
+									</h2>
+									<p className="mt-0.5 text-xs text-zinc-500">프로필 UUID · {studentDetailModal.id}</p>
+								</div>
+								<button
+									type="button"
+									onClick={closeStudentDetailModal}
+									className="rounded-lg px-2 py-1 text-sm text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800"
+								>
+									닫기
+								</button>
+							</div>
+
+							<section className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+								<h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">기본 정보</h3>
+								<dl className="mt-2 space-y-1 text-sm">
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">이름</dt>
+										<dd className="font-medium text-zinc-900">{studentDetailModal.name}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">아이디</dt>
+										<dd className="font-mono text-zinc-900">{studentDetailModal.username}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">학원</dt>
+										<dd className="text-zinc-900">{studentDetailModal.academy}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">연락처</dt>
+										<dd className="text-zinc-900">{studentDetailModal.phone}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">승인</dt>
+										<dd className={studentDetailModal.is_approved ? "font-medium text-emerald-700" : "font-medium text-amber-700"}>
+											{studentDetailModal.is_approved ? "승인됨" : "대기"}
+										</dd>
+									</div>
+								</dl>
+							</section>
+
+							<section className="mt-4 border-t border-zinc-100 pt-4">
+								<h3 className="text-sm font-semibold text-zinc-900">비밀번호 초기화</h3>
+								<p className="mt-1 text-xs text-zinc-500">Supabase Auth에만 반영되며 DB에 평문으로 저장되지 않습니다.</p>
+								<div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+									<input
+										type="password"
+										value={modalResetPassword}
+										onChange={(e) => setModalResetPassword(e.target.value)}
+										placeholder="새 비밀번호 (6자 이상)"
+										className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500 sm:max-w-xs"
+										autoComplete="new-password"
+									/>
+									<button
+										type="button"
+										onClick={() => void handleModalPasswordReset()}
+										disabled={isSavingModalPassword}
+										className="inline-flex min-h-9 shrink-0 items-center rounded-xl border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:opacity-60"
+									>
+										{isSavingModalPassword ? "저장 중…" : "적용"}
+									</button>
+								</div>
+								{modalPasswordError ? <p className="mt-2 text-sm text-rose-600">{modalPasswordError}</p> : null}
+								{modalPasswordMessage ? <p className="mt-2 text-sm text-emerald-700">{modalPasswordMessage}</p> : null}
+							</section>
+
+							{detailLoading ? <p className="mt-4 text-sm text-zinc-600">불러오는 중…</p> : null}
+
+							<section className="mt-4 border-t border-zinc-100 pt-4">
+								<h3 className="text-sm font-semibold text-zinc-900">성적</h3>
+								{detailExamError ? <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailExamError}</p> : null}
+								{!detailLoading && !detailExamError && detailExamRecords.length === 0 ? (
+									<p className="mt-2 text-sm text-zinc-500">등록된 성적이 없습니다.</p>
+								) : null}
+								<ul className="mt-2 max-h-44 space-y-2 overflow-y-auto">
+									{detailExamRecords.map((row) => (
+										<li key={row.id} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
+											<div className="flex justify-between gap-2">
+												<span className="font-medium text-zinc-900">{row.exam_name}</span>
+												<span className="shrink-0 text-xs text-zinc-500">{toKoreanDate(row.created_at)}</span>
+											</div>
+											<p className="mt-1 text-xs text-zinc-600">
+												점수 {row.score} · 등급 {row.grade}
+											</p>
+										</li>
+									))}
+								</ul>
+							</section>
+
+							<section className="mt-5 border-t border-zinc-100 pt-4">
+								<h3 className="text-sm font-semibold text-zinc-900">관리자 메모 (타임라인)</h3>
+								{detailMemoError ? <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailMemoError}</p> : null}
+								{!detailLoading && !detailMemoError && detailMemos.length === 0 ? (
+									<p className="mt-2 text-sm text-zinc-500">메모가 없습니다.</p>
+								) : null}
+								<ul className="relative mt-3 max-h-52 space-y-0 overflow-y-auto border-l-2 border-zinc-200 pl-4">
+									{[...detailMemos]
+										.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+										.map((m) => (
+											<li key={m.id} className="relative pb-4 last:pb-0">
+												<span className="absolute -left-[calc(0.5rem+5px)] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-400 ring-1 ring-zinc-200" aria-hidden />
+												<p className="text-[11px] font-medium text-zinc-500">{toKoreanDate(m.created_at)}</p>
+												<p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{m.content}</p>
+											</li>
+										))}
+								</ul>
+
+								<form className="mt-4 space-y-2" onSubmit={handleAddStudentMemo}>
+									<textarea
+										value={memoNewContent}
+										onChange={(e) => setMemoNewContent(e.target.value)}
+										rows={3}
+										placeholder="새 메모를 입력하세요."
+										className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+									/>
+									{memoFormError ? <p className="text-sm text-rose-600">{memoFormError}</p> : null}
+									{memoFormMessage ? <p className="text-sm text-emerald-700">{memoFormMessage}</p> : null}
+									<button
+										type="submit"
+										disabled={memoSubmitting}
+										className="inline-flex min-h-9 items-center gap-1 rounded-xl bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+									>
+										<MessageSquareText className="h-3.5 w-3.5" />
+										{memoSubmitting ? "등록 중…" : "메모 추가"}
+									</button>
+								</form>
+							</section>
+						</div>
+					</div>
 				) : null}
 
 				{listError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{listError}</p> : null}

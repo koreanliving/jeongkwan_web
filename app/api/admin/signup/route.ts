@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAdminRequest } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
+import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
 import { randomUUID } from "crypto";
 
 export async function GET(request: NextRequest) {
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
 		if (body.action === "approve") {
 			const { data: signupData, error: fetchError } = await supabaseAdmin
 				.from("signup_requests")
-				.select("id, student_id, student_name, phone, password")
+				.select("id, student_id, student_name, phone, password, academy")
 				.eq("id", body.id)
 				.maybeSingle();
 
@@ -48,20 +49,39 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 정보를 찾을 수 없습니다." }, { status: 404 });
 			}
 
+			const username = (signupData.student_id ?? "").trim() || `user_${Date.now()}`;
+			const password = (signupData.password ?? "").trim() || randomUUID().slice(0, 8);
+			const email = studentEmailFromUsername(username);
+			const academy = (signupData.academy as string) || "-";
+			const phone = String(signupData.phone ?? "").replace(/[-\s]/g, "") || "-";
 
-			const studentId = (signupData.student_id ?? '').trim() || `user_${Date.now()}`;
-			const password = (signupData.password ?? '').trim() || randomUUID().slice(0, 8);
-
-			// 회원이 원하는 비밀번호로 계정 생성
-			const { error: insertError } = await supabaseAdmin.from("students").insert({
-				student_id: studentId,
-				name: signupData.student_name as string,
+			const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+				email,
 				password,
-				is_active: true,
+				email_confirm: true,
 			});
 
-			if (insertError) {
-				return NextResponse.json({ message: "학생 계정 생성에 실패했습니다." }, { status: 500 });
+			if (createError || !created.user) {
+				return NextResponse.json(
+					{ message: createError?.message ?? "Auth 계정 생성에 실패했습니다." },
+					{ status: 500 },
+				);
+			}
+
+			const userId = created.user.id;
+
+			const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+				id: userId,
+				username,
+				name: signupData.student_name as string,
+				academy,
+				phone,
+				is_approved: true,
+			});
+
+			if (profileError) {
+				await supabaseAdmin.auth.admin.deleteUser(userId);
+				return NextResponse.json({ message: "프로필 생성에 실패했습니다." }, { status: 500 });
 			}
 
 			const { error: updateError } = await supabaseAdmin
@@ -75,7 +95,7 @@ export async function POST(request: NextRequest) {
 
 			return NextResponse.json({
 				ok: true,
-				studentId,
+				studentId: username,
 				password,
 				studentName: signupData.student_name,
 				phone: signupData.phone,

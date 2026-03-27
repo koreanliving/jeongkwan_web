@@ -23,22 +23,23 @@ export async function GET(request: NextRequest) {
 		return NextResponse.json({ message: "요청 목록을 불러오지 못했습니다." }, { status: 500 });
 	}
 
-	const studentIds = Array.from(new Set(data.map((item) => item.student_id as number)));
-	const { data: studentsData } = await supabaseAdmin
-		.from("students")
-		.select("id, student_id, name")
+	const studentIds = Array.from(new Set(data.map((item) => String(item.student_id))));
+	const { data: profilesData } = await supabaseAdmin
+		.from("profiles")
+		.select("id, username, name")
 		.in("id", studentIds);
 
-	const studentMap = new Map<number, { student_id: string; name: string }>();
-	(studentsData ?? []).forEach((student) => {
-		studentMap.set(student.id as number, {
-			student_id: student.student_id as string,
-			name: student.name as string,
+	const studentMap = new Map<string, { student_id: string; name: string }>();
+	(profilesData ?? []).forEach((row) => {
+		studentMap.set(String(row.id), {
+			student_id: row.username as string,
+			name: row.name as string,
 		});
 	});
 
 	const requests = data.map((item) => {
-		const student = studentMap.get(item.student_id as number);
+		const sid = String(item.student_id);
+		const student = studentMap.get(sid);
 		return {
 			...item,
 			student_code: student?.student_id ?? "",
