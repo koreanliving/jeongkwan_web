@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
+import { FileText, Home, MessageSquareText, Pencil, PlayCircle, Trash2, UserRound } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 
 type ExamRecord = {
@@ -39,6 +39,14 @@ export default function MyPage() {
 	const [message, setMessage] = useState("");
 	const [showPostDates, setShowPostDates] = useState(true);
 	const [studentLabel, setStudentLabel] = useState("");
+	const [studentInfo, setStudentInfo] = useState<{ academy: string; grade: string | null } | null>(null);
+	const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
+	const [editExamName, setEditExamName] = useState("");
+	const [editScoreInput, setEditScoreInput] = useState("");
+	const [editGradeInput, setEditGradeInput] = useState("");
+	const [recordMutateError, setRecordMutateError] = useState("");
+	const [savingRecordId, setSavingRecordId] = useState<number | null>(null);
+	const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null);
 
 	const loadExamRecords = useCallback(async () => {
 		setIsLoading(true);
@@ -63,11 +71,14 @@ export default function MyPage() {
 		setError("");
 
 		const reqRes = await fetch("/api/requests", { cache: "no-store" });
-		const reqData = (await reqRes.json()) as { student?: { id: string; name: string } };
+		const reqData = (await reqRes.json()) as {
+			student?: { id: string; name: string; academy?: string; grade?: string | null };
+		};
 
 		if (!reqRes.ok || !reqData.student) {
 			setAuth("guest");
 			setStudentLabel("");
+			setStudentInfo(null);
 			setRecords([]);
 			setIsLoading(false);
 			return;
@@ -75,6 +86,10 @@ export default function MyPage() {
 
 		setAuth("user");
 		setStudentLabel(`${reqData.student.name} (${reqData.student.id})`);
+		setStudentInfo({
+			academy: reqData.student.academy ?? "-",
+			grade: reqData.student.grade ?? null,
+		});
 
 		const exRes = await fetch("/api/exam-records", { cache: "no-store" });
 		const exData = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
@@ -160,6 +175,84 @@ export default function MyPage() {
 		await loadExamRecords();
 	};
 
+	const startEditRecord = (row: ExamRecord) => {
+		setRecordMutateError("");
+		setEditingRecordId(row.id);
+		setEditExamName(row.exam_name);
+		setEditScoreInput(String(row.score));
+		setEditGradeInput(String(row.grade));
+	};
+
+	const cancelEditRecord = () => {
+		setEditingRecordId(null);
+		setRecordMutateError("");
+	};
+
+	const saveEditRecord = async (event: FormEvent) => {
+		event.preventDefault();
+		if (editingRecordId === null) return;
+		setRecordMutateError("");
+
+		const name = editExamName.trim();
+		const score = Number.parseInt(editScoreInput, 10);
+		const grade = Number.parseInt(editGradeInput, 10);
+		if (!name) {
+			setRecordMutateError("시험 이름을 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(score) || !Number.isInteger(score)) {
+			setRecordMutateError("점수는 정수로 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(grade) || !Number.isInteger(grade)) {
+			setRecordMutateError("등급은 정수로 입력해 주세요.");
+			return;
+		}
+
+		setSavingRecordId(editingRecordId);
+		const response = await fetch("/api/exam-records", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: editingRecordId,
+				examName: name,
+				score,
+				grade,
+			}),
+		});
+		const result = (await response.json()) as { message?: string };
+		setSavingRecordId(null);
+
+		if (!response.ok) {
+			setRecordMutateError(result.message ?? "성적 수정에 실패했습니다.");
+			return;
+		}
+
+		cancelEditRecord();
+		await loadExamRecords();
+	};
+
+	const deleteRecord = async (id: number) => {
+		if (!window.confirm("이 성적을 삭제할까요?")) return;
+		setRecordMutateError("");
+		setDeletingRecordId(id);
+		const response = await fetch("/api/exam-records", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+		setDeletingRecordId(null);
+
+		if (!response.ok) {
+			setRecordMutateError(result.message ?? "성적 삭제에 실패했습니다.");
+			return;
+		}
+
+		setEditingRecordId((cur) => (cur === id ? null : cur));
+		await loadExamRecords();
+	};
+
 	return (
 		<main className="relative min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
 			<div className="mx-auto w-full max-w-sm">
@@ -189,6 +282,27 @@ export default function MyPage() {
 
 				{auth === "user" ? (
 					<>
+						{studentInfo ? (
+							<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+								<h2 className="text-base font-semibold text-zinc-900">학생 정보</h2>
+								<dl className="mt-3 space-y-2 text-sm">
+									<div className="flex justify-between gap-3 border-b border-zinc-100 pb-2">
+										<dt className="text-zinc-500">수강 학원</dt>
+										<dd className="text-right font-medium text-zinc-900">{studentInfo.academy}</dd>
+									</div>
+									<div className="flex justify-between gap-3">
+										<dt className="text-zinc-500">학년</dt>
+										<dd className="text-right font-medium text-zinc-900">
+											{studentInfo.grade ?? "가입 신청 시 기록 없음"}
+										</dd>
+									</div>
+								</dl>
+								<p className="mt-3 text-xs text-zinc-500">
+									학원은 프로필 기준이며, 학년은 승인된 가입 신청에 적힌 값을 보여 줍니다.
+								</p>
+							</section>
+						) : null}
+
 						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
 							<h2 className="text-base font-semibold text-zinc-900">성적 추가</h2>
 							<form className="mt-3 space-y-3" onSubmit={handleSubmit}>
@@ -196,7 +310,7 @@ export default function MyPage() {
 									type="text"
 									value={examName}
 									onChange={(e) => setExamName(e.target.value)}
-									placeholder="시험 이름"
+									placeholder="예: 3월 교육청 모의고사, 한수 모의고사 1회"
 									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
 								/>
 								<div className="grid grid-cols-2 gap-2">
@@ -233,23 +347,95 @@ export default function MyPage() {
 							<h2 className="text-base font-semibold text-zinc-900">내 성적</h2>
 							{isLoading ? <p className="mt-3 text-sm text-zinc-600">불러오는 중입니다…</p> : null}
 							{!isLoading && error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
+							{recordMutateError ? (
+								<p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+									{recordMutateError}
+								</p>
+							) : null}
 							{!isLoading && !error && records.length === 0 ? (
 								<p className="mt-3 text-sm text-zinc-500">등록된 성적이 없습니다.</p>
 							) : null}
 							<ul className="mt-3 space-y-2">
 								{records.map((row) => (
 									<li key={row.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3">
-										<div className="flex items-start justify-between gap-2">
-											<p className="text-sm font-semibold text-zinc-900">{row.exam_name}</p>
-											<span className="shrink-0 text-xs text-zinc-500">
-												{showPostDates ? toKoreanDate(row.created_at) : ""}
-											</span>
-										</div>
-										<p className="mt-1 text-sm text-zinc-700">
-											점수 <span className="font-medium text-zinc-900">{row.score}</span>
-											{" · "}
-											등급 <span className="font-medium text-zinc-900">{row.grade}</span>
-										</p>
+										{editingRecordId === row.id ? (
+											<form className="space-y-2" onSubmit={saveEditRecord}>
+												<input
+													type="text"
+													value={editExamName}
+													onChange={(e) => setEditExamName(e.target.value)}
+													placeholder="예: 3월 교육청 모의고사"
+													className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+												/>
+												<div className="grid grid-cols-2 gap-2">
+													<input
+														type="number"
+														inputMode="numeric"
+														value={editScoreInput}
+														onChange={(e) => setEditScoreInput(e.target.value)}
+														placeholder="점수"
+														className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+													/>
+													<input
+														type="number"
+														inputMode="numeric"
+														value={editGradeInput}
+														onChange={(e) => setEditGradeInput(e.target.value)}
+														placeholder="등급"
+														className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+													/>
+												</div>
+												<div className="flex flex-wrap gap-2">
+													<button
+														type="submit"
+														disabled={savingRecordId === row.id}
+														className="rounded-xl bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+													>
+														{savingRecordId === row.id ? "저장 중…" : "저장"}
+													</button>
+													<button
+														type="button"
+														onClick={cancelEditRecord}
+														className="rounded-xl border border-zinc-300 bg-white px-3 py-1.5 text-xs font-semibold text-zinc-800"
+													>
+														취소
+													</button>
+												</div>
+											</form>
+										) : (
+											<>
+												<div className="flex items-start justify-between gap-2">
+													<p className="text-sm font-semibold text-zinc-900">{row.exam_name}</p>
+													<div className="flex shrink-0 items-center gap-1">
+														<span className="text-xs text-zinc-500">
+															{showPostDates ? toKoreanDate(row.created_at) : ""}
+														</span>
+														<button
+															type="button"
+															onClick={() => startEditRecord(row)}
+															className="rounded-lg p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+															aria-label="성적 수정"
+														>
+															<Pencil className="h-4 w-4" />
+														</button>
+														<button
+															type="button"
+															onClick={() => void deleteRecord(row.id)}
+															disabled={deletingRecordId === row.id}
+															className="rounded-lg p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+															aria-label="성적 삭제"
+														>
+															<Trash2 className="h-4 w-4" />
+														</button>
+													</div>
+												</div>
+												<p className="mt-1 text-sm text-zinc-700">
+													점수 <span className="font-medium text-zinc-900">{row.score}</span>
+													{" · "}
+													등급 <span className="font-medium text-zinc-900">{row.grade}</span>
+												</p>
+											</>
+										)}
 									</li>
 								))}
 							</ul>

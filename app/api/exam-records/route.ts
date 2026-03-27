@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addExamRecord, getExamRecordsForStudent } from "@/utils/examRecordsMemos";
+import {
+	addExamRecord,
+	deleteExamRecord,
+	getExamRecordsForStudent,
+	updateExamRecord,
+} from "@/utils/examRecordsMemos";
 import { getStudentSession, isAdminRequest } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
@@ -9,6 +14,35 @@ function parseStudentIdParam(searchParams: URLSearchParams): string | null {
 	if (raw === null || raw === "") return null;
 	const id = raw.trim();
 	return isValidUuid(id) ? id : null;
+}
+
+async function getExamRecordOwnerStudentId(recordId: number): Promise<string | null> {
+	const { data, error } = await supabaseAdmin
+		.from("exam_records")
+		.select("student_id")
+		.eq("id", recordId)
+		.maybeSingle();
+	if (error || !data) return null;
+	return String((data as { student_id: string }).student_id);
+}
+
+async function assertExamRecordAccess(
+	request: NextRequest,
+	recordId: number,
+): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
+	const admin = isAdminRequest(request);
+	const session = await getStudentSession(request);
+	if (!admin && !session) {
+		return { ok: false, response: NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 }) };
+	}
+	const ownerId = await getExamRecordOwnerStudentId(recordId);
+	if (!ownerId) {
+		return { ok: false, response: NextResponse.json({ message: "성적을 찾을 수 없습니다." }, { status: 404 }) };
+	}
+	if (!admin && session!.userId !== ownerId) {
+		return { ok: false, response: NextResponse.json({ message: "권한이 없습니다." }, { status: 401 }) };
+	}
+	return { ok: true };
 }
 
 export async function GET(request: NextRequest) {
@@ -89,6 +123,59 @@ export async function POST(request: NextRequest) {
 		}
 
 		return NextResponse.json({ record: result.data });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function PATCH(request: NextRequest) {
+	try {
+		const body = (await request.json()) as {
+			id?: unknown;
+			examName?: unknown;
+			score?: unknown;
+			grade?: unknown;
+		};
+		const id = typeof body.id === "number" ? body.id : Number(body.id);
+		if (!Number.isInteger(id) || id < 1) {
+			return NextResponse.json({ message: "유효한 성적 ID가 필요합니다." }, { status: 400 });
+		}
+
+		const access = await assertExamRecordAccess(request, id);
+		if (!access.ok) return access.response;
+
+		const examName = typeof body.examName === "string" ? body.examName : "";
+		const score = typeof body.score === "number" ? body.score : Number(body.score);
+		const grade = typeof body.grade === "number" ? body.grade : Number(body.grade);
+
+		const result = await updateExamRecord(supabaseAdmin, id, { examName, score, grade });
+		if (result.error) {
+			const status = result.error.includes("유효한") || result.error.includes("입력") ? 400 : 500;
+			return NextResponse.json({ message: result.error }, { status });
+		}
+		return NextResponse.json({ record: result.data });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function DELETE(request: NextRequest) {
+	try {
+		const body = (await request.json()) as { id?: unknown };
+		const id = typeof body.id === "number" ? body.id : Number(body.id);
+		if (!Number.isInteger(id) || id < 1) {
+			return NextResponse.json({ message: "유효한 성적 ID가 필요합니다." }, { status: 400 });
+		}
+
+		const access = await assertExamRecordAccess(request, id);
+		if (!access.ok) return access.response;
+
+		const result = await deleteExamRecord(supabaseAdmin, id);
+		if (result.error) {
+			const status = result.error.includes("유효한") ? 400 : 500;
+			return NextResponse.json({ message: result.error }, { status });
+		}
+		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
 	}

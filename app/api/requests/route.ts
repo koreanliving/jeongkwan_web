@@ -25,8 +25,31 @@ export async function GET(request: NextRequest) {
 		return NextResponse.json({ message: "요청 목록을 불러오지 못했습니다." }, { status: 500 });
 	}
 
+	const { data: profileRow } = await supabaseAdmin
+		.from("profiles")
+		.select("academy")
+		.eq("id", session.userId)
+		.maybeSingle();
+
+	const { data: signupGradeRow } = await supabaseAdmin
+		.from("signup_requests")
+		.select("grade")
+		.eq("student_id", session.username)
+		.eq("status", "승인")
+		.order("updated_at", { ascending: false })
+		.limit(1)
+		.maybeSingle();
+
+	const academy = (profileRow?.academy as string | undefined)?.trim() || "-";
+	const gradeFromSignup = (signupGradeRow?.grade as string | undefined)?.trim() || null;
+
 	return NextResponse.json({
-		student: { id: session.username, name: session.name },
+		student: {
+			id: session.username,
+			name: session.name,
+			academy,
+			grade: gradeFromSignup,
+		},
 		userId: session.userId,
 		requests: data ?? [],
 	});

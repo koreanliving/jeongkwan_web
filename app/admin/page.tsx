@@ -234,6 +234,13 @@ export default function AdminPage() {
 	const [detailExamFormError, setDetailExamFormError] = useState("");
 	const [detailExamFormMessage, setDetailExamFormMessage] = useState("");
 	const [isDeletingMemoId, setIsDeletingMemoId] = useState<number | null>(null);
+	const [detailExamEditingId, setDetailExamEditingId] = useState<number | null>(null);
+	const [detailEditExamName, setDetailEditExamName] = useState("");
+	const [detailEditExamScore, setDetailEditExamScore] = useState("");
+	const [detailEditExamGrade, setDetailEditExamGrade] = useState("");
+	const [detailExamMutateError, setDetailExamMutateError] = useState("");
+	const [detailSavingExamId, setDetailSavingExamId] = useState<number | null>(null);
+	const [detailDeletingExamId, setDetailDeletingExamId] = useState<number | null>(null);
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
@@ -764,6 +771,13 @@ export default function AdminPage() {
 		setDetailExamFormError("");
 		setDetailExamFormMessage("");
 		setIsDeletingMemoId(null);
+		setDetailExamEditingId(null);
+		setDetailEditExamName("");
+		setDetailEditExamScore("");
+		setDetailEditExamGrade("");
+		setDetailExamMutateError("");
+		setDetailSavingExamId(null);
+		setDetailDeletingExamId(null);
 	};
 
 	const openStudentDetailModal = async (student: StudentItem) => {
@@ -781,6 +795,13 @@ export default function AdminPage() {
 		setDetailExamGradeInput("");
 		setDetailExamFormError("");
 		setDetailExamFormMessage("");
+		setDetailExamEditingId(null);
+		setDetailEditExamName("");
+		setDetailEditExamScore("");
+		setDetailEditExamGrade("");
+		setDetailExamMutateError("");
+		setDetailSavingExamId(null);
+		setDetailDeletingExamId(null);
 		setDetailExamRecords([]);
 		setDetailMemos([]);
 
@@ -892,14 +913,97 @@ export default function AdminPage() {
 		setDetailExamGradeInput("");
 		setDetailExamFormMessage("성적이 등록되었습니다.");
 
-		const exRes = await fetch(`/api/exam-records?studentId=${encodeURIComponent(studentDetailModal.id)}`, {
-			cache: "no-store",
-		});
+		await reloadDetailExams();
+	};
+
+	const reloadDetailExams = async () => {
+		const modal = studentDetailModal;
+		if (!modal) return;
+		const exRes = await fetch(`/api/exam-records?studentId=${encodeURIComponent(modal.id)}`, { cache: "no-store" });
 		const exJson = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
 		if (exRes.ok) {
 			setDetailExamRecords(exJson.records ?? []);
 			setDetailExamError("");
 		}
+	};
+
+	const startDetailExamEdit = (row: ExamRecord) => {
+		setDetailExamMutateError("");
+		setDetailExamEditingId(row.id);
+		setDetailEditExamName(row.exam_name);
+		setDetailEditExamScore(String(row.score));
+		setDetailEditExamGrade(String(row.grade));
+	};
+
+	const cancelDetailExamEdit = () => {
+		setDetailExamEditingId(null);
+		setDetailExamMutateError("");
+	};
+
+	const handleDetailExamSaveEdit = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!studentDetailModal || detailExamEditingId === null) return;
+		setDetailExamMutateError("");
+
+		const name = detailEditExamName.trim();
+		const score = Number.parseInt(detailEditExamScore, 10);
+		const grade = Number.parseInt(detailEditExamGrade, 10);
+		if (!name) {
+			setDetailExamMutateError("시험 이름을 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(score) || !Number.isInteger(score)) {
+			setDetailExamMutateError("점수는 정수로 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(grade) || !Number.isInteger(grade)) {
+			setDetailExamMutateError("등급은 정수로 입력해 주세요.");
+			return;
+		}
+
+		setDetailSavingExamId(detailExamEditingId);
+		const res = await fetch("/api/exam-records", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: detailExamEditingId,
+				examName: name,
+				score,
+				grade,
+			}),
+		});
+		const json = (await res.json()) as { message?: string };
+		setDetailSavingExamId(null);
+
+		if (!res.ok) {
+			setDetailExamMutateError(json.message ?? "성적 수정에 실패했습니다.");
+			return;
+		}
+
+		cancelDetailExamEdit();
+		await reloadDetailExams();
+	};
+
+	const handleDetailExamDelete = async (examId: number) => {
+		if (!studentDetailModal) return;
+		if (!window.confirm("이 성적을 삭제할까요?")) return;
+		setDetailExamMutateError("");
+		setDetailDeletingExamId(examId);
+		const res = await fetch("/api/exam-records", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: examId }),
+		});
+		const json = (await res.json()) as { message?: string };
+		setDetailDeletingExamId(null);
+
+		if (!res.ok) {
+			setDetailExamMutateError(json.message ?? "성적 삭제에 실패했습니다.");
+			return;
+		}
+
+		setDetailExamEditingId((cur) => (cur === examId ? null : cur));
+		await reloadDetailExams();
 	};
 
 	const handleDeleteStudentMemo = async (memoId: number) => {
@@ -1573,19 +1677,89 @@ export default function AdminPage() {
 							<section className="mt-4 border-t border-zinc-100 pt-4">
 								<h3 className="text-sm font-semibold text-zinc-900">성적</h3>
 								{detailExamError ? <p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailExamError}</p> : null}
+								{detailExamMutateError ? (
+									<p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailExamMutateError}</p>
+								) : null}
 								{!detailLoading && !detailExamError && detailExamRecords.length === 0 ? (
 									<p className="mt-2 text-sm text-zinc-500">등록된 성적이 없습니다.</p>
 								) : null}
 								<ul className="mt-2 max-h-44 space-y-2 overflow-y-auto">
 									{detailExamRecords.map((row) => (
 										<li key={row.id} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
-											<div className="flex justify-between gap-2">
-												<span className="font-medium text-zinc-900">{row.exam_name}</span>
-												<span className="shrink-0 text-xs text-zinc-500">{toKoreanDate(row.created_at)}</span>
-											</div>
-											<p className="mt-1 text-xs text-zinc-600">
-												점수 {row.score} · 등급 {row.grade}
-											</p>
+											{detailExamEditingId === row.id ? (
+												<form className="space-y-2" onSubmit={handleDetailExamSaveEdit}>
+													<input
+														type="text"
+														value={detailEditExamName}
+														onChange={(e) => setDetailEditExamName(e.target.value)}
+														placeholder="예: 3월 교육청 모의고사"
+														className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
+													/>
+													<div className="grid grid-cols-2 gap-2">
+														<input
+															type="number"
+															inputMode="numeric"
+															value={detailEditExamScore}
+															onChange={(e) => setDetailEditExamScore(e.target.value)}
+															placeholder="점수"
+															className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
+														/>
+														<input
+															type="number"
+															inputMode="numeric"
+															value={detailEditExamGrade}
+															onChange={(e) => setDetailEditExamGrade(e.target.value)}
+															placeholder="등급"
+															className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
+														/>
+													</div>
+													<div className="flex flex-wrap gap-1.5">
+														<button
+															type="submit"
+															disabled={detailSavingExamId === row.id}
+															className="rounded-lg bg-zinc-900 px-2 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+														>
+															{detailSavingExamId === row.id ? "저장 중…" : "저장"}
+														</button>
+														<button
+															type="button"
+															onClick={cancelDetailExamEdit}
+															className="rounded-lg border border-zinc-300 bg-white px-2 py-1 text-[11px] font-semibold text-zinc-800"
+														>
+															취소
+														</button>
+													</div>
+												</form>
+											) : (
+												<>
+													<div className="flex justify-between gap-2">
+														<span className="font-medium text-zinc-900">{row.exam_name}</span>
+														<div className="flex shrink-0 items-center gap-0.5">
+															<span className="text-xs text-zinc-500">{toKoreanDate(row.created_at)}</span>
+															<button
+																type="button"
+																onClick={() => startDetailExamEdit(row)}
+																className="rounded p-1 text-zinc-400 hover:bg-zinc-200 hover:text-zinc-700"
+																aria-label="성적 수정"
+															>
+																<Pencil className="h-3.5 w-3.5" />
+															</button>
+															<button
+																type="button"
+																onClick={() => void handleDetailExamDelete(row.id)}
+																disabled={detailDeletingExamId === row.id}
+																className="rounded p-1 text-zinc-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+																aria-label="성적 삭제"
+															>
+																<Trash2 className="h-3.5 w-3.5" />
+															</button>
+														</div>
+													</div>
+													<p className="mt-1 text-xs text-zinc-600">
+														점수 {row.score} · 등급 {row.grade}
+													</p>
+												</>
+											)}
 										</li>
 									))}
 								</ul>
@@ -1596,7 +1770,7 @@ export default function AdminPage() {
 										type="text"
 										value={detailExamName}
 										onChange={(e) => setDetailExamName(e.target.value)}
-										placeholder="시험 이름"
+										placeholder="예: 3월 교육청 모의고사, 한수 모의고사 1회"
 										className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
 									/>
 									<div className="grid grid-cols-2 gap-2">

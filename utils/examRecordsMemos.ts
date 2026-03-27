@@ -42,6 +42,7 @@ type Ok<T> = { data: T; error: null };
 type Err = { data: null; error: string };
 export type ExamRecordsQueryResult = Ok<ExamRecord[]> | Err;
 export type ExamRecordInsertResult = Ok<ExamRecord> | Err;
+export type ExamRecordUpdateResult = Ok<ExamRecord> | Err;
 export type MemosQueryResult = Ok<Memo[]> | Err;
 export type MemoInsertResult = Ok<Memo> | Err;
 
@@ -134,6 +135,71 @@ export async function addExamRecord(client: SupabaseClient, input: CreateExamRec
 	}
 
 	return { data: mapExamRecord(data as Record<string, unknown>), error: null };
+}
+
+export type UpdateExamRecordInput = {
+	examName: string;
+	score: number;
+	grade: number;
+};
+
+/**
+ * 성적 한 건 수정
+ */
+export async function updateExamRecord(
+	client: SupabaseClient,
+	recordId: number,
+	input: UpdateExamRecordInput,
+): Promise<ExamRecordUpdateResult> {
+	if (!Number.isInteger(recordId) || recordId < 1) {
+		return { data: null, error: "유효한 성적 ID가 아닙니다." };
+	}
+
+	const name = input.examName.trim();
+	if (!name) {
+		return { data: null, error: "시험 이름을 입력해 주세요." };
+	}
+	if (!Number.isInteger(input.score)) {
+		return { data: null, error: "점수는 정수여야 합니다." };
+	}
+	if (!Number.isInteger(input.grade)) {
+		return { data: null, error: "등급은 정수여야 합니다." };
+	}
+
+	const { data, error } = await client
+		.from("exam_records")
+		.update({
+			exam_name: name,
+			score: input.score,
+			grade: input.grade,
+		})
+		.eq("id", recordId)
+		.select("id, student_id, exam_name, score, grade, created_at")
+		.single();
+
+	if (error) {
+		return { data: null, error: formatExamMemoDbError(error.message, "성적 수정에 실패했습니다.") };
+	}
+	if (!data) {
+		return { data: null, error: "수정할 성적을 찾을 수 없습니다." };
+	}
+
+	return { data: mapExamRecord(data as Record<string, unknown>), error: null };
+}
+
+/**
+ * 성적 한 건 삭제
+ */
+export async function deleteExamRecord(client: SupabaseClient, recordId: number): Promise<{ error: string | null }> {
+	if (!Number.isInteger(recordId) || recordId < 1) {
+		return { error: "유효한 성적 ID가 아닙니다." };
+	}
+
+	const { error } = await client.from("exam_records").delete().eq("id", recordId);
+	if (error) {
+		return { error: formatExamMemoDbError(error.message, "성적 삭제에 실패했습니다.") };
+	}
+	return { error: null };
 }
 
 /**

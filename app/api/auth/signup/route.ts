@@ -8,18 +8,25 @@ function isValidAcademy(value: string): boolean {
 }
 
 export async function POST(request: Request) {
+	let body: {
+		studentId?: string;
+		password?: string;
+		studentName?: string;
+		academy?: string;
+		phone?: string;
+		grade?: string;
+		recentTest?: string | null;
+		recentGrade?: string | null;
+		selectedSubject?: string | null;
+	};
+
 	try {
-		const body = (await request.json()) as {
-			studentId?: string;
-			password?: string;
-			studentName?: string;
-			academy?: string;
-			phone?: string;
-			grade?: string;
-			recentTest?: string | null;
-			recentGrade?: string | null;
-			selectedSubject?: string | null;
-		};
+		body = (await request.json()) as typeof body;
+	} catch {
+		return NextResponse.json({ message: "요청 형식이 올바르지 않습니다. 페이지를 새로고침 후 다시 시도해 주세요." }, { status: 400 });
+	}
+
+	try {
 
 		const studentId = (body.studentId ?? "").trim();
 		const password = (body.password ?? "").trim();
@@ -98,10 +105,21 @@ export async function POST(request: Request) {
 		}
 
 		return NextResponse.json({ ok: true });
-	} catch {
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : "";
+		if (msg.includes("SUPABASE_SERVICE_ROLE_KEY")) {
+			return NextResponse.json(
+				{
+					message:
+						"서버에 Supabase 설정이 없습니다. 배포(예: Vercel) 환경 변수에 SUPABASE_SERVICE_ROLE_KEY(service_role)와 NEXT_PUBLIC_SUPABASE_URL을 등록했는지 확인해 주세요.",
+				},
+				{ status: 503 },
+			);
+		}
+		console.error("[api/auth/signup]", e);
 		return NextResponse.json(
-			{ message: "요청 데이터가 올바르지 않습니다." },
-			{ status: 400 }
+			{ message: "가입 신청 처리 중 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요." },
+			{ status: 500 },
 		);
 	}
 }
