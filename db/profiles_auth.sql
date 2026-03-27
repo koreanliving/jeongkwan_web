@@ -1,5 +1,7 @@
 -- Supabase Auth + public.profiles
 -- 기존 students(bigint) 연동 데이터가 있으면 백업 후, 아래 TRUNCATE 전에 마이그레이션하세요.
+-- profiles 만 먼저 만든 경우: exam_records/memos/student_requests 가 bigint 이면
+-- db/migrate_exam_memos_student_id_to_uuid.sql 을 Supabase SQL Editor 에서 실행하세요.
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,

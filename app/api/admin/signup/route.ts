@@ -62,10 +62,15 @@ export async function POST(request: NextRequest) {
 			});
 
 			if (createError || !created.user) {
-				return NextResponse.json(
-					{ message: createError?.message ?? "Auth 계정 생성에 실패했습니다." },
-					{ status: 500 },
-				);
+				const raw = createError?.message ?? "Auth 계정 생성에 실패했습니다.";
+				const isKeyIssue =
+					raw.toLowerCase().includes("not allowed") ||
+					raw.toLowerCase().includes("jwt") ||
+					raw.includes("401");
+				const hint = isKeyIssue
+					? " 서버 .env 의 SUPABASE_SERVICE_ROLE_KEY(service_role)가 올바른지 확인해 주세요. anon 키로는 관리자 승인이 불가능합니다."
+					: "";
+				return NextResponse.json({ message: `${raw}${hint}` }, { status: 500 });
 			}
 
 			const userId = created.user.id;
@@ -81,7 +86,14 @@ export async function POST(request: NextRequest) {
 
 			if (profileError) {
 				await supabaseAdmin.auth.admin.deleteUser(userId);
-				return NextResponse.json({ message: "프로필 생성에 실패했습니다." }, { status: 500 });
+				return NextResponse.json(
+					{
+						message: "프로필 생성에 실패했습니다.",
+						detail: profileError.message,
+						code: profileError.code,
+					},
+					{ status: 500 },
+				);
 			}
 
 			const { error: updateError } = await supabaseAdmin

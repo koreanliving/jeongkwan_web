@@ -1,6 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isValidUuid } from "@/utils/uuidValidation";
 
+/** DB가 student_id 를 bigint 로 두고 있을 때 Postgres 오류를 한글 안내로 보강합니다. */
+function formatExamMemoDbError(raw: string | undefined, fallback: string): string {
+	const msg = raw || fallback;
+	if (/bigint/i.test(msg) && /invalid input syntax/i.test(msg)) {
+		return `${msg} — DB의 exam_records·memos.student_id 가 아직 정수(bigint)일 수 있습니다. Supabase에서 db/migrate_exam_memos_student_id_to_uuid.sql 을 실행해 uuid(profiles.id)로 맞추세요.`;
+	}
+	return msg;
+}
+
 export type ExamRecord = {
 	id: number;
 	student_id: string;
@@ -78,7 +87,7 @@ export async function getExamRecordsForStudent(
 		.order("created_at", { ascending: false });
 
 	if (error) {
-		return { data: null, error: error.message || "성적 기록을 불러오지 못했습니다." };
+		return { data: null, error: formatExamMemoDbError(error.message, "성적 기록을 불러오지 못했습니다.") };
 	}
 
 	const rows = (data ?? []) as Record<string, unknown>[];
@@ -118,7 +127,7 @@ export async function addExamRecord(client: SupabaseClient, input: CreateExamRec
 		.single();
 
 	if (error) {
-		return { data: null, error: error.message || "성적 추가에 실패했습니다." };
+		return { data: null, error: formatExamMemoDbError(error.message, "성적 추가에 실패했습니다.") };
 	}
 	if (!data) {
 		return { data: null, error: "성적 추가 후 데이터를 확인할 수 없습니다." };
@@ -142,7 +151,7 @@ export async function getMemosForStudent(client: SupabaseClient, studentId: stri
 		.order("created_at", { ascending: false });
 
 	if (error) {
-		return { data: null, error: error.message || "메모를 불러오지 못했습니다." };
+		return { data: null, error: formatExamMemoDbError(error.message, "메모를 불러오지 못했습니다.") };
 	}
 
 	const rows = (data ?? []) as Record<string, unknown>[];
@@ -174,11 +183,26 @@ export async function addMemo(client: SupabaseClient, input: CreateMemoInput): P
 		.single();
 
 	if (error) {
-		return { data: null, error: error.message || "메모 추가에 실패했습니다." };
+		return { data: null, error: formatExamMemoDbError(error.message, "메모 추가에 실패했습니다.") };
 	}
 	if (!data) {
 		return { data: null, error: "메모 추가 후 데이터를 확인할 수 없습니다." };
 	}
 
 	return { data: mapMemo(data as Record<string, unknown>), error: null };
+}
+
+/**
+ * 관리자용: 메모 한 건 삭제
+ */
+export async function deleteMemo(client: SupabaseClient, memoId: number): Promise<{ error: string | null }> {
+	if (!Number.isInteger(memoId) || memoId < 1) {
+		return { error: "유효한 메모 ID가 아닙니다." };
+	}
+
+	const { error } = await client.from("memos").delete().eq("id", memoId);
+	if (error) {
+		return { error: formatExamMemoDbError(error.message, "메모 삭제에 실패했습니다.") };
+	}
+	return { error: null };
 }

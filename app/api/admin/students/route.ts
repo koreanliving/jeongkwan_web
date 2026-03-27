@@ -15,7 +15,11 @@ export async function GET(request: NextRequest) {
 		.order("created_at", { ascending: false });
 
 	if (error) {
-		return NextResponse.json({ message: "학생 목록을 불러오지 못했습니다." }, { status: 500 });
+		const hint =
+			error.message?.includes("permission") || error.message?.includes("policy")
+				? " RLS 또는 키 문제일 수 있습니다. SUPABASE_SERVICE_ROLE_KEY(service_role)를 사용 중인지 확인해 주세요."
+				: "";
+		return NextResponse.json({ message: `학생 목록을 불러오지 못했습니다.${hint}`, detail: error.message }, { status: 500 });
 	}
 
 	return NextResponse.json({ students: data ?? [] });
@@ -75,7 +79,14 @@ export async function POST(request: NextRequest) {
 
 		if (profileError) {
 			await supabaseAdmin.auth.admin.deleteUser(userId);
-			return NextResponse.json({ message: "프로필 생성에 실패했습니다." }, { status: 500 });
+			return NextResponse.json(
+				{
+					message: "프로필 생성에 실패했습니다.",
+					detail: profileError.message,
+					code: profileError.code,
+				},
+				{ status: 500 },
+			);
 		}
 
 		return NextResponse.json({ ok: true, id: userId });

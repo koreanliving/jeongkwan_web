@@ -227,6 +227,13 @@ export default function AdminPage() {
 	const [modalPasswordError, setModalPasswordError] = useState("");
 	const [modalPasswordMessage, setModalPasswordMessage] = useState("");
 	const [isSavingModalPassword, setIsSavingModalPassword] = useState(false);
+	const [detailExamName, setDetailExamName] = useState("");
+	const [detailExamScoreInput, setDetailExamScoreInput] = useState("");
+	const [detailExamGradeInput, setDetailExamGradeInput] = useState("");
+	const [detailExamSubmitting, setDetailExamSubmitting] = useState(false);
+	const [detailExamFormError, setDetailExamFormError] = useState("");
+	const [detailExamFormMessage, setDetailExamFormMessage] = useState("");
+	const [isDeletingMemoId, setIsDeletingMemoId] = useState<number | null>(null);
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
@@ -237,12 +244,17 @@ export default function AdminPage() {
 			fetch("/api/admin/signup", { cache: "no-store" }),
 		]);
 
-		const studentsResult = (await studentsResponse.json()) as { students?: StudentItem[]; message?: string };
+		const studentsResult = (await studentsResponse.json()) as {
+			students?: StudentItem[];
+			message?: string;
+			detail?: string;
+		};
 		const requestsResult = (await requestsResponse.json()) as { requests?: StudentRequestItem[]; message?: string };
 		const signupResult = (await signupResponse.json()) as { signupRequests?: SignupRequestItem[]; message?: string };
 
 		if (!studentsResponse.ok) {
-			setStudentsError(studentsResult.message ?? "학생 목록을 불러오지 못했습니다.");
+			const base = studentsResult.message ?? "학생 목록을 불러오지 못했습니다.";
+			setStudentsError(studentsResult.detail ? `${base} (${studentsResult.detail})` : base);
 			setStudents([]);
 		} else {
 			setStudentsError("");
@@ -746,6 +758,12 @@ export default function AdminPage() {
 		setModalResetPassword("");
 		setModalPasswordError("");
 		setModalPasswordMessage("");
+		setDetailExamName("");
+		setDetailExamScoreInput("");
+		setDetailExamGradeInput("");
+		setDetailExamFormError("");
+		setDetailExamFormMessage("");
+		setIsDeletingMemoId(null);
 	};
 
 	const openStudentDetailModal = async (student: StudentItem) => {
@@ -758,6 +776,11 @@ export default function AdminPage() {
 		setModalResetPassword("");
 		setModalPasswordError("");
 		setModalPasswordMessage("");
+		setDetailExamName("");
+		setDetailExamScoreInput("");
+		setDetailExamGradeInput("");
+		setDetailExamFormError("");
+		setDetailExamFormMessage("");
 		setDetailExamRecords([]);
 		setDetailMemos([]);
 
@@ -814,6 +837,92 @@ export default function AdminPage() {
 		setMemoNewContent("");
 		setMemoFormMessage("메모가 등록되었습니다.");
 
+		const memRes = await fetch(`/api/memos?studentId=${encodeURIComponent(studentDetailModal.id)}`, { cache: "no-store" });
+		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
+		if (memRes.ok) {
+			setDetailMemos(memJson.memos ?? []);
+			setDetailMemoError("");
+		}
+	};
+
+	const handleAddStudentExam = async (event: FormEvent) => {
+		event.preventDefault();
+		if (!studentDetailModal) return;
+		setDetailExamFormError("");
+		setDetailExamFormMessage("");
+
+		const name = detailExamName.trim();
+		const score = Number.parseInt(detailExamScoreInput, 10);
+		const grade = Number.parseInt(detailExamGradeInput, 10);
+
+		if (!name) {
+			setDetailExamFormError("시험 이름을 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(score) || !Number.isInteger(score)) {
+			setDetailExamFormError("점수는 정수로 입력해 주세요.");
+			return;
+		}
+		if (!Number.isFinite(grade) || !Number.isInteger(grade)) {
+			setDetailExamFormError("등급은 정수로 입력해 주세요.");
+			return;
+		}
+
+		setDetailExamSubmitting(true);
+		const res = await fetch("/api/exam-records", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				studentId: studentDetailModal.id,
+				examName: name,
+				score,
+				grade,
+			}),
+		});
+		const json = (await res.json()) as { message?: string };
+		setDetailExamSubmitting(false);
+
+		if (!res.ok) {
+			setDetailExamFormError(json.message ?? "성적 등록에 실패했습니다.");
+			return;
+		}
+
+		setDetailExamName("");
+		setDetailExamScoreInput("");
+		setDetailExamGradeInput("");
+		setDetailExamFormMessage("성적이 등록되었습니다.");
+
+		const exRes = await fetch(`/api/exam-records?studentId=${encodeURIComponent(studentDetailModal.id)}`, {
+			cache: "no-store",
+		});
+		const exJson = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
+		if (exRes.ok) {
+			setDetailExamRecords(exJson.records ?? []);
+			setDetailExamError("");
+		}
+	};
+
+	const handleDeleteStudentMemo = async (memoId: number) => {
+		if (!studentDetailModal) return;
+		if (!window.confirm("이 메모를 삭제할까요?")) return;
+		setMemoFormError("");
+		setMemoFormMessage("");
+		setIsDeletingMemoId(memoId);
+
+		const res = await fetch("/api/memos", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: memoId }),
+		});
+		const json = (await res.json()) as { message?: string };
+		setIsDeletingMemoId(null);
+
+		if (!res.ok) {
+			setMemoFormError(json.message ?? "메모 삭제에 실패했습니다.");
+			return;
+		}
+
+		setMemoFormMessage("메모를 삭제했습니다.");
 		const memRes = await fetch(`/api/memos?studentId=${encodeURIComponent(studentDetailModal.id)}`, { cache: "no-store" });
 		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
 		if (memRes.ok) {
@@ -887,12 +996,14 @@ export default function AdminPage() {
 		});
 		const result = (await response.json()) as {
 			message?: string;
+			detail?: string;
 			studentId?: string;
 			password?: string;
 		};
 
 		if (!response.ok) {
-			setSignupError(result.message ?? "가입 신청 처리에 실패했습니다.");
+			const base = result.message ?? "가입 신청 처리에 실패했습니다.";
+			setSignupError(result.detail ? `${base} — ${result.detail}` : base);
 			setIsProcessingSignupId(null);
 			return;
 		}
@@ -1478,6 +1589,44 @@ export default function AdminPage() {
 										</li>
 									))}
 								</ul>
+
+								<form className="mt-4 space-y-2 border-t border-zinc-100 pt-4" onSubmit={handleAddStudentExam}>
+									<h4 className="text-xs font-semibold text-zinc-700">성적 추가</h4>
+									<input
+										type="text"
+										value={detailExamName}
+										onChange={(e) => setDetailExamName(e.target.value)}
+										placeholder="시험 이름"
+										className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+									/>
+									<div className="grid grid-cols-2 gap-2">
+										<input
+											type="number"
+											inputMode="numeric"
+											value={detailExamScoreInput}
+											onChange={(e) => setDetailExamScoreInput(e.target.value)}
+											placeholder="점수"
+											className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+										/>
+										<input
+											type="number"
+											inputMode="numeric"
+											value={detailExamGradeInput}
+											onChange={(e) => setDetailExamGradeInput(e.target.value)}
+											placeholder="등급"
+											className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+										/>
+									</div>
+									{detailExamFormError ? <p className="text-sm text-rose-600">{detailExamFormError}</p> : null}
+									{detailExamFormMessage ? <p className="text-sm text-emerald-700">{detailExamFormMessage}</p> : null}
+									<button
+										type="submit"
+										disabled={detailExamSubmitting}
+										className="inline-flex min-h-9 w-full items-center justify-center rounded-xl bg-zinc-900 px-3 text-xs font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400"
+									>
+										{detailExamSubmitting ? "등록 중…" : "성적 등록"}
+									</button>
+								</form>
 							</section>
 
 							<section className="mt-5 border-t border-zinc-100 pt-4">
@@ -1492,7 +1641,18 @@ export default function AdminPage() {
 										.map((m) => (
 											<li key={m.id} className="relative pb-4 last:pb-0">
 												<span className="absolute -left-[calc(0.5rem+5px)] top-1.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-zinc-400 ring-1 ring-zinc-200" aria-hidden />
-												<p className="text-[11px] font-medium text-zinc-500">{toKoreanDate(m.created_at)}</p>
+												<div className="flex items-start justify-between gap-2">
+													<p className="text-[11px] font-medium text-zinc-500">{toKoreanDate(m.created_at)}</p>
+													<button
+														type="button"
+														onClick={() => void handleDeleteStudentMemo(m.id)}
+														disabled={isDeletingMemoId === m.id}
+														className="shrink-0 rounded-lg p-1 text-zinc-400 transition hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+														aria-label="메모 삭제"
+													>
+														<Trash2 className="h-3.5 w-3.5" />
+													</button>
+												</div>
 												<p className="mt-1 whitespace-pre-wrap text-sm text-zinc-800">{m.content}</p>
 											</li>
 										))}

@@ -17,11 +17,11 @@ export async function GET(request: NextRequest) {
 	let studentId = parseStudentIdParam(request.nextUrl.searchParams);
 
 	if (studentId === null) {
-		if (admin) {
-			return NextResponse.json({ message: "유효한 studentId 쿼리가 필요합니다." }, { status: 400 });
-		}
+		// 관리자 쿠키가 있어도 마이페이지 등에서는 학생 세션으로 본인 성적을 봅니다.
 		if (session) {
 			studentId = session.userId;
+		} else if (admin) {
+			return NextResponse.json({ message: "유효한 studentId 쿼리가 필요합니다." }, { status: 400 });
 		} else {
 			return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
 		}
@@ -55,11 +55,22 @@ export async function POST(request: NextRequest) {
 			grade?: unknown;
 		};
 
-		const studentId = admin
-			? typeof body.studentId === "string"
-				? body.studentId.trim()
-				: String(body.studentId ?? "").trim()
-			: session!.userId;
+		const rawStudentId =
+			typeof body.studentId === "string" ? body.studentId.trim() : String(body.studentId ?? "").trim();
+
+		let studentId: string;
+		if (!admin) {
+			studentId = session!.userId;
+		} else if (rawStudentId) {
+			if (!isValidUuid(rawStudentId)) {
+				return NextResponse.json({ message: "유효한 studentId가 필요합니다." }, { status: 400 });
+			}
+			studentId = rawStudentId;
+		} else if (session) {
+			studentId = session.userId;
+		} else {
+			return NextResponse.json({ message: "유효한 studentId가 필요합니다." }, { status: 400 });
+		}
 
 		const examName = typeof body.examName === "string" ? body.examName : "";
 		const score = typeof body.score === "number" ? body.score : Number(body.score);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addMemo, getMemosForStudent } from "@/utils/examRecordsMemos";
+import { addMemo, deleteMemo, getMemosForStudent } from "@/utils/examRecordsMemos";
 import { isAdminRequest } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
@@ -59,6 +59,26 @@ export async function POST(request: NextRequest) {
 		}
 
 		return NextResponse.json({ memo: result.data });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function DELETE(request: NextRequest) {
+	if (!isAdminRequest(request)) {
+		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
+	}
+
+	try {
+		const body = (await request.json()) as { id?: unknown };
+		const raw = body.id;
+		const id = typeof raw === "number" ? raw : Number(raw);
+		const result = await deleteMemo(supabaseAdmin, id);
+		if (result.error) {
+			const status = result.error.includes("유효한") ? 400 : 500;
+			return NextResponse.json({ message: result.error }, { status });
+		}
+		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
 	}
