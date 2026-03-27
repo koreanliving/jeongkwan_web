@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Link2, MessageSquareText, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { supabase } from "../../utils/supabase";
 import { parseStructuredMaterialContent } from "../../utils/materialParser";
 
@@ -150,11 +150,17 @@ export default function AdminPage() {
 	const [createMessage, setCreateMessage] = useState("");
 	const [isCreating, setIsCreating] = useState(false);
 
-	const [selectedMaterialId, setSelectedMaterialId] = useState<number | null>(null);
-	const [attachFile, setAttachFile] = useState<File | null>(null);
-	const [isAttaching, setIsAttaching] = useState(false);
-	const [attachError, setAttachError] = useState("");
-	const [attachMessage, setAttachMessage] = useState("");
+	const [editingMaterialId, setEditingMaterialId] = useState<number | null>(null);
+	const [editTitle, setEditTitle] = useState("");
+	const [editSubtitle, setEditSubtitle] = useState("");
+	const [editCategory, setEditCategory] = useState<Category>("문학");
+	const [editContent, setEditContent] = useState("");
+	const [editOriginalFileUrl, setEditOriginalFileUrl] = useState<string | null>(null);
+	const [editOriginalFileName, setEditOriginalFileName] = useState<string | null>(null);
+	const [editNewFile, setEditNewFile] = useState<File | null>(null);
+	const [editError, setEditError] = useState("");
+	const [isLoadingEditMaterial, setIsLoadingEditMaterial] = useState(false);
+	const [isSavingEdit, setIsSavingEdit] = useState(false);
 
 	const [videoTitle, setVideoTitle] = useState("");
 	const [videoCategory, setVideoCategory] = useState<Category>("문학");
@@ -205,11 +211,6 @@ export default function AdminPage() {
 	const [editingPasswordId, setEditingPasswordId] = useState<number | null>(null);
 	const [editingPassword, setEditingPassword] = useState("");
 	const [isSavingPasswordId, setIsSavingPasswordId] = useState<number | null>(null);
-
-	const selectedMaterial = useMemo(
-		() => materials.find((item) => item.id === selectedMaterialId) ?? null,
-		[materials, selectedMaterialId],
-	);
 
 	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
 
@@ -372,42 +373,106 @@ export default function AdminPage() {
 		}
 	};
 
-	const handleAttachPdf = async (event: FormEvent) => {
+	const closeMaterialEdit = () => {
+		setEditingMaterialId(null);
+		setEditError("");
+		setEditNewFile(null);
+		setIsLoadingEditMaterial(false);
+	};
+
+	const openMaterialEdit = async (material: MaterialItem) => {
+		setEditingMaterialId(material.id);
+		setEditError("");
+		setEditNewFile(null);
+		setIsLoadingEditMaterial(true);
+		const { data, error } = await supabase
+			.from("materials")
+			.select("id, title, subtitle, content, category, file_url, file_name, file_size")
+			.eq("id", material.id)
+			.single();
+		setIsLoadingEditMaterial(false);
+		if (error || !data) {
+			setEditError("자료 정보를 불러오지 못했습니다.");
+			setEditingMaterialId(null);
+			return;
+		}
+		setEditTitle(data.title ?? "");
+		setEditSubtitle(data.subtitle ?? "");
+		setEditCategory((data.category as Category) || "문학");
+		setEditContent(typeof data.content === "string" ? data.content : "");
+		setEditOriginalFileUrl(data.file_url ?? null);
+		setEditOriginalFileName(data.file_name ?? null);
+	};
+
+	const handleSaveMaterialEdit = async (event: FormEvent) => {
 		event.preventDefault();
-		setAttachError("");
-		setAttachMessage("");
-		if (!selectedMaterialId) {
-			setAttachError("첨부할 자료를 선택해 주세요.");
+		if (editingMaterialId === null) return;
+		setEditError("");
+		setDeleteError("");
+		setDeleteMessage("");
+
+		if (!editTitle.trim()) {
+			setEditError("제목은 필수입니다.");
 			return;
 		}
-		if (!attachFile) {
-			setAttachError("PDF 파일을 선택해 주세요.");
+		if (editNewFile && editNewFile.type !== "application/pdf") {
+			setEditError("PDF 파일만 업로드할 수 있습니다.");
 			return;
 		}
-		if (attachFile.type !== "application/pdf") {
-			setAttachError("PDF 파일만 업로드할 수 있습니다.");
+		const willHavePdf = Boolean(editNewFile || editOriginalFileUrl);
+		if (!editContent.trim() && !willHavePdf) {
+			setEditError("본문 또는 PDF 중 하나는 입력해 주세요.");
 			return;
 		}
 
-		setIsAttaching(true);
+		setIsSavingEdit(true);
+		const base = {
+			title: editTitle.trim(),
+			subtitle: editSubtitle.trim() || null,
+			category: editCategory,
+			content: editContent.trim(),
+		};
+
 		try {
-			const filePath = await uploadPdfToStorage(selectedMaterialId, attachFile);
-			const { error } = await supabase
-				.from("materials")
-				.update({ file_url: filePath, file_name: attachFile.name, file_size: attachFile.size })
-				.eq("id", selectedMaterialId);
-			if (error) {
-				setAttachError("PDF 연결에 실패했습니다.");
-				setIsAttaching(false);
-				return;
+			if (editNewFile) {
+				const oldStoragePath = toStoragePath(editOriginalFileUrl);
+				const newPath = await uploadPdfToStorage(editingMaterialId, editNewFile);
+				const { error: updateError } = await supabase
+					.from("materials")
+					.update({
+						...base,
+						file_url: newPath,
+						file_name: editNewFile.name,
+						file_size: editNewFile.size,
+					})
+					.eq("id", editingMaterialId);
+
+				if (updateError) {
+					await supabase.storage.from("materials").remove([newPath]);
+					setEditError(updateError.message || "자료 저장에 실패했습니다.");
+					setIsSavingEdit(false);
+					return;
+				}
+
+				if (oldStoragePath && oldStoragePath !== newPath) {
+					await supabase.storage.from("materials").remove([oldStoragePath]);
+				}
+			} else {
+				const { error: updateError } = await supabase.from("materials").update(base).eq("id", editingMaterialId);
+				if (updateError) {
+					setEditError(updateError.message || "자료 저장에 실패했습니다.");
+					setIsSavingEdit(false);
+					return;
+				}
 			}
-			setAttachFile(null);
-			setAttachMessage("PDF 첨부가 완료되었습니다.");
+
+			closeMaterialEdit();
+			setDeleteMessage("자료가 수정되었습니다.");
 			await fetchAdminData();
-		} catch (error) {
-			setAttachError(error instanceof Error ? error.message : "PDF 업로드 중 오류가 발생했습니다.");
+		} catch (err) {
+			setEditError(err instanceof Error ? err.message : "저장 중 오류가 발생했습니다.");
 		} finally {
-			setIsAttaching(false);
+			setIsSavingEdit(false);
 		}
 	};
 
@@ -873,32 +938,6 @@ export default function AdminPage() {
 						</section>
 
 						<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
-							<h2 className="text-lg font-semibold text-zinc-900">기존 자료에 PDF 첨부</h2>
-							<form className="mt-4 space-y-3" onSubmit={handleAttachPdf}>
-								<select value={selectedMaterialId ?? ""} onChange={(e) => {
-									const value = Number(e.target.value);
-									setSelectedMaterialId(Number.isFinite(value) && value > 0 ? value : null);
-								}} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500">
-									<option value="">자료 선택</option>
-									{materials.map((item) => <option key={item.id} value={item.id}>#{item.id} {item.title}</option>)}
-								</select>
-								{selectedMaterial ? <p className="text-xs text-zinc-500">선택됨: {selectedMaterial.title} ({toKoreanDate(selectedMaterial.created_at)})</p> : null}
-								<div className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2.5">
-									<label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-700">
-										<Link2 className="h-4 w-4" /> PDF 파일 선택
-										<input type="file" accept="application/pdf" onChange={(e) => setAttachFile(e.target.files?.[0] ?? null)} className="hidden" />
-									</label>
-									<p className="mt-1 text-xs text-zinc-500">{attachFile ? attachFile.name : "선택된 파일 없음"}</p>
-								</div>
-								{attachError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{attachError}</p> : null}
-								{attachMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{attachMessage}</p> : null}
-								<button type="submit" disabled={isAttaching || isLoadingList} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
-									<Upload className="h-4 w-4" />{isAttaching ? "업로드 중..." : "PDF 첨부"}
-								</button>
-							</form>
-						</section>
-
-						<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
 							<h2 className="text-lg font-semibold text-zinc-900">자료 목록</h2>
 							{deleteError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{deleteError}</p> : null}
 							{deleteMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{deleteMessage}</p> : null}
@@ -908,13 +947,77 @@ export default function AdminPage() {
 										<p className="text-sm font-medium text-zinc-800">#{material.id} {material.title}</p>
 										<p className="mt-0.5 text-xs text-zinc-500">{material.subtitle || "부제 없음"}</p>
 										<p className="mt-0.5 text-xs text-zinc-500">{material.category} · {toKoreanDate(material.created_at)}{material.file_name ? ` · ${material.file_name}` : ""}</p>
-										<button type="button" onClick={() => handleDeleteMaterial(material)} disabled={isDeletingMaterialId === material.id} className="mt-2 inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 px-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
-											<Trash2 className="h-3.5 w-3.5" />{isDeletingMaterialId === material.id ? "삭제 중..." : "자료 삭제"}
-										</button>
+										<div className="mt-2 flex flex-wrap gap-2">
+											<button type="button" onClick={() => void openMaterialEdit(material)} disabled={editingMaterialId !== null} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-zinc-300 px-2.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60">
+												<Pencil className="h-3.5 w-3.5" />자료 수정
+											</button>
+											<button type="button" onClick={() => handleDeleteMaterial(material)} disabled={isDeletingMaterialId === material.id} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 px-2.5 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60">
+												<Trash2 className="h-3.5 w-3.5" />{isDeletingMaterialId === material.id ? "삭제 중..." : "자료 삭제"}
+											</button>
+										</div>
 									</div>
 								))}
 							</div>
 						</section>
+
+						{editingMaterialId !== null ? (
+							<div
+								className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+								role="dialog"
+								aria-modal="true"
+								aria-labelledby="material-edit-title"
+								onClick={closeMaterialEdit}
+							>
+								<div
+									className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_24px_60px_-20px_rgba(0,0,0,0.45)]"
+									onClick={(e) => e.stopPropagation()}
+								>
+									<div className="flex items-start justify-between gap-3">
+										<h2 id="material-edit-title" className="text-lg font-semibold text-zinc-900">자료 수정</h2>
+										<button type="button" onClick={closeMaterialEdit} className="rounded-lg px-2 py-1 text-sm text-zinc-500 transition hover:bg-zinc-100 hover:text-zinc-800">
+											닫기
+										</button>
+									</div>
+
+									{isLoadingEditMaterial ? (
+										<p className="mt-6 text-sm text-zinc-600">자료 정보를 불러오는 중입니다…</p>
+									) : (
+										<form className="mt-4 space-y-3" onSubmit={handleSaveMaterialEdit}>
+											<input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="자료 제목" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+											<input type="text" value={editSubtitle} onChange={(e) => setEditSubtitle(e.target.value)} placeholder="자료 부제 (리스트 카드 상단 미리보기 문구)" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+											<select value={editCategory} onChange={(e) => setEditCategory(e.target.value as Category)} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500">
+												<option value="문학">문학</option>
+												<option value="비문학">비문학</option>
+											</select>
+											<textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} placeholder="파싱형 원문/해설 텍스트를 전체 입력하세요." className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+
+											<p className="text-xs text-zinc-500">
+												현재 PDF: {editOriginalFileName || "없음"}
+												{editNewFile ? ` → 교체: ${editNewFile.name}` : ""}
+											</p>
+											<div className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2.5">
+												<label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-700">
+													<Upload className="h-4 w-4" /> 새 PDF로 교체 (선택)
+													<input type="file" accept="application/pdf" onChange={(e) => setEditNewFile(e.target.files?.[0] ?? null)} className="hidden" />
+												</label>
+												<p className="mt-1 text-xs text-zinc-500">{editNewFile ? editNewFile.name : "선택 시 기존 파일은 저장 후 삭제됩니다."}</p>
+											</div>
+
+											{editError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{editError}</p> : null}
+
+											<div className="flex flex-wrap gap-2 pt-1">
+												<button type="button" onClick={closeMaterialEdit} className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 px-4 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">
+													취소
+												</button>
+												<button type="submit" disabled={isSavingEdit} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-zinc-900 px-4 text-sm font-semibold text-white transition hover:bg-zinc-700 disabled:cursor-not-allowed disabled:bg-zinc-400">
+													<Save className="h-4 w-4" />{isSavingEdit ? "저장 중..." : "변경 저장"}
+												</button>
+											</div>
+										</form>
+									)}
+								</div>
+							</div>
+						) : null}
 					</>
 				) : null}
 
