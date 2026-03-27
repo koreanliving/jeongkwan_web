@@ -1,4 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+	EXAM_KIND_OTHER,
+	type ExamKind,
+	formatExamDisplayName,
+	isValidExamKind,
+	isValidIsoDateOnly,
+} from "@/utils/examKinds";
 import { isValidUuid } from "@/utils/uuidValidation";
 
 /** DB가 student_id 를 bigint 로 두고 있을 때 Postgres 오류를 한글 안내로 보강합니다. */
@@ -13,7 +20,12 @@ function formatExamMemoDbError(raw: string | undefined, fallback: string): strin
 export type ExamRecord = {
 	id: number;
 	student_id: string;
+	/** 표시용(기존 호환). `formatExamDisplayName(exam_kind, exam_detail)` 과 동일 목적 */
 	exam_name: string;
+	exam_kind: string;
+	exam_detail: string | null;
+	/** YYYY-MM-DD */
+	exam_date: string;
 	score: number;
 	grade: number;
 	created_at: string;
@@ -28,7 +40,11 @@ export type Memo = {
 
 export type CreateExamRecordInput = {
 	studentId: string;
-	examName: string;
+	examKind: ExamKind;
+	/** `사설/기타`일 때 필수 */
+	examDetail: string | null;
+	/** YYYY-MM-DD */
+	examDate: string;
 	score: number;
 	grade: number;
 };
@@ -51,10 +67,29 @@ function invalidStudentIdError(): Err {
 }
 
 function mapExamRecord(row: Record<string, unknown>): ExamRecord {
+	const examKindRaw = row.exam_kind;
+	const examKind =
+		typeof examKindRaw === "string" && examKindRaw.trim() ? examKindRaw.trim() : EXAM_KIND_OTHER;
+	const detailRaw = row.exam_detail;
+	const examDetail =
+		detailRaw != null && String(detailRaw).trim() ? String(detailRaw).trim() : null;
+	const dateRaw = row.exam_date;
+	let examDate =
+		typeof dateRaw === "string" && dateRaw.length >= 10 ? dateRaw.slice(0, 10) : "";
+	if (!examDate && row.created_at) {
+		examDate = String(row.created_at).slice(0, 10);
+	}
+	const display = formatExamDisplayName(examKind, examDetail);
+	const legacyName = String(row.exam_name ?? "").trim();
+	const exam_name = legacyName || display;
+
 	return {
 		id: Number(row.id),
 		student_id: String(row.student_id ?? ""),
-		exam_name: String(row.exam_name ?? ""),
+		exam_name,
+		exam_kind: examKind,
+		exam_detail: examDetail,
+		exam_date: examDate,
 		score: Number(row.score),
 		grade: Number(row.grade),
 		created_at: String(row.created_at ?? ""),
@@ -83,11 +118,19 @@ export async function getExamRecordsForStudent(
 
 	const { data, error } = await client
 		.from("exam_records")
-		.select("id, student_id, exam_name, score, grade, created_at")
+		.select("id, student_id, exam_name, exam_kind, exam_detail, exam_date, score, grade, created_at")
 		.eq("student_id", studentId)
+		.order("exam_date", { ascending: false, nullsFirst: false })
 		.order("created_at", { ascending: false });
 
 	if (error) {
+		if (error.code === "42703" || error.message?.includes("exam_kind") || error.message?.includes("exam_date")) {
+			return {
+				data: null,
+				error:
+					"성적 테이블 스키마가 최신이 아닙니다. Supabase에서 db/exam_records_exam_kind_date.sql 을 실행해 주세요.",
+			};
+		}
 		return { data: null, error: formatExamMemoDbError(error.message, "성적 기록을 불러오지 못했습니다.") };
 	}
 
@@ -99,15 +142,23 @@ export async function getExamRecordsForStudent(
  * 학생에게 성적 기록을 추가합니다.
  */
 export async function addExamRecord(client: SupabaseClient, input: CreateExamRecordInput): Promise<ExamRecordInsertResult> {
-	const { studentId, examName, score, grade } = input;
+	const { studentId, examKind, examDetail, examDate, score, grade } = input;
 
 	if (!isValidUuid(studentId)) {
 		return invalidStudentIdError();
 	}
 
-	const name = examName.trim();
-	if (!name) {
-		return { data: null, error: "시험 이름을 입력해 주세요." };
+	if (!isValidExamKind(examKind)) {
+		return { data: null, error: "시험 종류를 선택해 주세요." };
+	}
+	if (examKind === EXAM_KIND_OTHER) {
+		const d = (examDetail ?? "").trim();
+		if (!d) {
+			return { data: null, error: "사설/기타 선택 시 상세 시험 이름을 입력해 주세요." };
+		}
+	}
+	if (!isValidIsoDateOnly(examDate)) {
+		return { data: null, error: "응시일을 선택해 주세요." };
 	}
 	if (!Number.isInteger(score)) {
 		return { data: null, error: "점수는 정수여야 합니다." };
@@ -116,18 +167,31 @@ export async function addExamRecord(client: SupabaseClient, input: CreateExamRec
 		return { data: null, error: "등급은 정수여야 합니다." };
 	}
 
+	const detailForDb = examKind === EXAM_KIND_OTHER ? (examDetail ?? "").trim() : null;
+	const displayName = formatExamDisplayName(examKind, detailForDb);
+
 	const { data, error } = await client
 		.from("exam_records")
 		.insert({
 			student_id: studentId,
-			exam_name: name,
+			exam_kind: examKind,
+			exam_detail: detailForDb,
+			exam_date: examDate,
+			exam_name: displayName,
 			score,
 			grade,
 		})
-		.select("id, student_id, exam_name, score, grade, created_at")
+		.select("id, student_id, exam_name, exam_kind, exam_detail, exam_date, score, grade, created_at")
 		.single();
 
 	if (error) {
+		if (error.code === "42703" || error.message?.includes("exam_kind") || error.message?.includes("exam_date")) {
+			return {
+				data: null,
+				error:
+					"성적 테이블 스키마가 최신이 아닙니다. Supabase에서 db/exam_records_exam_kind_date.sql 을 실행해 주세요.",
+			};
+		}
 		return { data: null, error: formatExamMemoDbError(error.message, "성적 추가에 실패했습니다.") };
 	}
 	if (!data) {
@@ -138,7 +202,9 @@ export async function addExamRecord(client: SupabaseClient, input: CreateExamRec
 }
 
 export type UpdateExamRecordInput = {
-	examName: string;
+	examKind: ExamKind;
+	examDetail: string | null;
+	examDate: string;
 	score: number;
 	grade: number;
 };
@@ -155,9 +221,17 @@ export async function updateExamRecord(
 		return { data: null, error: "유효한 성적 ID가 아닙니다." };
 	}
 
-	const name = input.examName.trim();
-	if (!name) {
-		return { data: null, error: "시험 이름을 입력해 주세요." };
+	if (!isValidExamKind(input.examKind)) {
+		return { data: null, error: "시험 종류를 선택해 주세요." };
+	}
+	if (input.examKind === EXAM_KIND_OTHER) {
+		const d = (input.examDetail ?? "").trim();
+		if (!d) {
+			return { data: null, error: "사설/기타 선택 시 상세 시험 이름을 입력해 주세요." };
+		}
+	}
+	if (!isValidIsoDateOnly(input.examDate)) {
+		return { data: null, error: "응시일을 선택해 주세요." };
 	}
 	if (!Number.isInteger(input.score)) {
 		return { data: null, error: "점수는 정수여야 합니다." };
@@ -166,18 +240,31 @@ export async function updateExamRecord(
 		return { data: null, error: "등급은 정수여야 합니다." };
 	}
 
+	const detailForDb = input.examKind === EXAM_KIND_OTHER ? (input.examDetail ?? "").trim() : null;
+	const displayName = formatExamDisplayName(input.examKind, detailForDb);
+
 	const { data, error } = await client
 		.from("exam_records")
 		.update({
-			exam_name: name,
+			exam_kind: input.examKind,
+			exam_detail: detailForDb,
+			exam_date: input.examDate,
+			exam_name: displayName,
 			score: input.score,
 			grade: input.grade,
 		})
 		.eq("id", recordId)
-		.select("id, student_id, exam_name, score, grade, created_at")
+		.select("id, student_id, exam_name, exam_kind, exam_detail, exam_date, score, grade, created_at")
 		.single();
 
 	if (error) {
+		if (error.code === "42703" || error.message?.includes("exam_kind") || error.message?.includes("exam_date")) {
+			return {
+				data: null,
+				error:
+					"성적 테이블 스키마가 최신이 아닙니다. Supabase에서 db/exam_records_exam_kind_date.sql 을 실행해 주세요.",
+			};
+		}
 		return { data: null, error: formatExamMemoDbError(error.message, "성적 수정에 실패했습니다.") };
 	}
 	if (!data) {

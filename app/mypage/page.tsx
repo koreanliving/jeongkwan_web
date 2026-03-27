@@ -3,16 +3,13 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Home, MessageSquareText, Pencil, PlayCircle, Trash2, UserRound } from "lucide-react";
+import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
+import { ExamTrendChart } from "@/components/ExamTrendChart";
 import { supabase } from "@/utils/supabase";
+import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
+import type { ExamRecord } from "@/utils/examRecordsMemos";
 
-type ExamRecord = {
-	id: number;
-	student_id: string;
-	exam_name: string;
-	score: number;
-	grade: number;
-	created_at: string;
-};
+const DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
 
 type HomeSetting = {
 	id: number;
@@ -32,7 +29,9 @@ export default function MyPage() {
 	const [records, setRecords] = useState<ExamRecord[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [isSubmitting, setIsSubmitting] = useState(false);
-	const [examName, setExamName] = useState("");
+	const [examKind, setExamKind] = useState<string>(DEFAULT_EXAM_KIND);
+	const [examDetail, setExamDetail] = useState("");
+	const [examDate, setExamDate] = useState("");
 	const [scoreInput, setScoreInput] = useState("");
 	const [gradeInput, setGradeInput] = useState("");
 	const [error, setError] = useState("");
@@ -41,7 +40,9 @@ export default function MyPage() {
 	const [studentLabel, setStudentLabel] = useState("");
 	const [studentInfo, setStudentInfo] = useState<{ academy: string; grade: string | null } | null>(null);
 	const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
-	const [editExamName, setEditExamName] = useState("");
+	const [editExamKind, setEditExamKind] = useState<string>(DEFAULT_EXAM_KIND);
+	const [editExamDetail, setEditExamDetail] = useState("");
+	const [editExamDate, setEditExamDate] = useState("");
 	const [editScoreInput, setEditScoreInput] = useState("");
 	const [editGradeInput, setEditGradeInput] = useState("");
 	const [recordMutateError, setRecordMutateError] = useState("");
@@ -92,7 +93,10 @@ export default function MyPage() {
 		});
 
 		const exRes = await fetch("/api/exam-records", { cache: "no-store" });
-		const exData = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
+		const exData = (await exRes.json()) as {
+			records?: ExamRecord[];
+			message?: string;
+		};
 
 		if (!exRes.ok) {
 			setError(exData.message ?? "성적을 불러오지 못했습니다.");
@@ -132,12 +136,15 @@ export default function MyPage() {
 		setError("");
 		setMessage("");
 
-		const name = examName.trim();
 		const score = Number.parseInt(scoreInput, 10);
 		const grade = Number.parseInt(gradeInput, 10);
 
-		if (!name) {
-			setError("시험 이름을 입력해 주세요.");
+		if (!examDate.trim()) {
+			setError("응시일을 선택해 주세요.");
+			return;
+		}
+		if (examKind === EXAM_KIND_OTHER && !examDetail.trim()) {
+			setError("사설/기타 선택 시 상세 시험 이름을 입력해 주세요.");
 			return;
 		}
 		if (!Number.isFinite(score) || !Number.isInteger(score)) {
@@ -154,7 +161,9 @@ export default function MyPage() {
 			method: "POST",
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
-				examName: name,
+				examKind,
+				examDetail: examKind === EXAM_KIND_OTHER ? examDetail.trim() : null,
+				examDate: examDate.trim(),
 				score,
 				grade,
 			}),
@@ -167,7 +176,9 @@ export default function MyPage() {
 			return;
 		}
 
-		setExamName("");
+		setExamKind(DEFAULT_EXAM_KIND);
+		setExamDetail("");
+		setExamDate("");
 		setScoreInput("");
 		setGradeInput("");
 		setMessage("성적이 등록되었습니다.");
@@ -178,7 +189,10 @@ export default function MyPage() {
 	const startEditRecord = (row: ExamRecord) => {
 		setRecordMutateError("");
 		setEditingRecordId(row.id);
-		setEditExamName(row.exam_name);
+		const kind = normalizeExamKindForForm(row.exam_kind);
+		setEditExamKind(kind);
+		setEditExamDetail(kind === EXAM_KIND_OTHER ? (row.exam_detail ?? row.exam_name).trim() : "");
+		setEditExamDate(row.exam_date || "");
 		setEditScoreInput(String(row.score));
 		setEditGradeInput(String(row.grade));
 	};
@@ -193,11 +207,14 @@ export default function MyPage() {
 		if (editingRecordId === null) return;
 		setRecordMutateError("");
 
-		const name = editExamName.trim();
 		const score = Number.parseInt(editScoreInput, 10);
 		const grade = Number.parseInt(editGradeInput, 10);
-		if (!name) {
-			setRecordMutateError("시험 이름을 입력해 주세요.");
+		if (!editExamDate.trim()) {
+			setRecordMutateError("응시일을 선택해 주세요.");
+			return;
+		}
+		if (editExamKind === EXAM_KIND_OTHER && !editExamDetail.trim()) {
+			setRecordMutateError("사설/기타 선택 시 상세 시험 이름을 입력해 주세요.");
 			return;
 		}
 		if (!Number.isFinite(score) || !Number.isInteger(score)) {
@@ -215,7 +232,9 @@ export default function MyPage() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				id: editingRecordId,
-				examName: name,
+				examKind: editExamKind,
+				examDetail: editExamKind === EXAM_KIND_OTHER ? editExamDetail.trim() : null,
+				examDate: editExamDate.trim(),
 				score,
 				grade,
 			}),
@@ -304,33 +323,27 @@ export default function MyPage() {
 						) : null}
 
 						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+							<h2 className="text-base font-semibold text-zinc-900">성적 추이</h2>
+							<ExamTrendChart records={records} className="mt-3" />
+						</section>
+
+						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
 							<h2 className="text-base font-semibold text-zinc-900">성적 추가</h2>
 							<form className="mt-3 space-y-3" onSubmit={handleSubmit}>
-								<input
-									type="text"
-									value={examName}
-									onChange={(e) => setExamName(e.target.value)}
-									placeholder="예: 3월 교육청 모의고사, 한수 모의고사 1회"
-									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+								<ExamScoreFormFields
+									examKind={examKind}
+									onExamKindChange={setExamKind}
+									examDetail={examDetail}
+									onExamDetailChange={setExamDetail}
+									examDate={examDate}
+									onExamDateChange={setExamDate}
+									scoreInput={scoreInput}
+									onScoreInputChange={setScoreInput}
+									gradeInput={gradeInput}
+									onGradeInputChange={setGradeInput}
+									selectId="mypage-exam-kind"
+									dateId="mypage-exam-date"
 								/>
-								<div className="grid grid-cols-2 gap-2">
-									<input
-										type="number"
-										inputMode="numeric"
-										value={scoreInput}
-										onChange={(e) => setScoreInput(e.target.value)}
-										placeholder="점수"
-										className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
-									/>
-									<input
-										type="number"
-										inputMode="numeric"
-										value={gradeInput}
-										onChange={(e) => setGradeInput(e.target.value)}
-										placeholder="등급"
-										className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
-									/>
-								</div>
 								{error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
 								{message ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
 								<button
@@ -360,31 +373,20 @@ export default function MyPage() {
 									<li key={row.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3">
 										{editingRecordId === row.id ? (
 											<form className="space-y-2" onSubmit={saveEditRecord}>
-												<input
-													type="text"
-													value={editExamName}
-													onChange={(e) => setEditExamName(e.target.value)}
-													placeholder="예: 3월 교육청 모의고사"
-													className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+												<ExamScoreFormFields
+													examKind={editExamKind}
+													onExamKindChange={setEditExamKind}
+													examDetail={editExamDetail}
+													onExamDetailChange={setEditExamDetail}
+													examDate={editExamDate}
+													onExamDateChange={setEditExamDate}
+													scoreInput={editScoreInput}
+													onScoreInputChange={setEditScoreInput}
+													gradeInput={editGradeInput}
+													onGradeInputChange={setEditGradeInput}
+													selectId={`mypage-edit-kind-${row.id}`}
+													dateId={`mypage-edit-date-${row.id}`}
 												/>
-												<div className="grid grid-cols-2 gap-2">
-													<input
-														type="number"
-														inputMode="numeric"
-														value={editScoreInput}
-														onChange={(e) => setEditScoreInput(e.target.value)}
-														placeholder="점수"
-														className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-													/>
-													<input
-														type="number"
-														inputMode="numeric"
-														value={editGradeInput}
-														onChange={(e) => setEditGradeInput(e.target.value)}
-														placeholder="등급"
-														className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-													/>
-												</div>
 												<div className="flex flex-wrap gap-2">
 													<button
 														type="submit"
@@ -405,11 +407,14 @@ export default function MyPage() {
 										) : (
 											<>
 												<div className="flex items-start justify-between gap-2">
-													<p className="text-sm font-semibold text-zinc-900">{row.exam_name}</p>
+													<div>
+														<p className="text-sm font-semibold text-zinc-900">{row.exam_name}</p>
+														<p className="mt-0.5 text-xs text-zinc-500">
+															응시일 {row.exam_date ? toKoreanDate(`${row.exam_date}T12:00:00`) : "-"}
+															{showPostDates ? ` · 등록 ${toKoreanDate(row.created_at)}` : ""}
+														</p>
+													</div>
 													<div className="flex shrink-0 items-center gap-1">
-														<span className="text-xs text-zinc-500">
-															{showPostDates ? toKoreanDate(row.created_at) : ""}
-														</span>
 														<button
 															type="button"
 															onClick={() => startEditRecord(row)}

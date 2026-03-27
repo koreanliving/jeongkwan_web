@@ -3,8 +3,13 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
+import { ExamTrendChart } from "@/components/ExamTrendChart";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
+import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import { supabase } from "../../utils/supabase";
+
+const ADMIN_DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
 import { parseStructuredMaterialContent } from "../../utils/materialParser";
 
 type Category = "문학" | "비문학";
@@ -227,7 +232,9 @@ export default function AdminPage() {
 	const [modalPasswordError, setModalPasswordError] = useState("");
 	const [modalPasswordMessage, setModalPasswordMessage] = useState("");
 	const [isSavingModalPassword, setIsSavingModalPassword] = useState(false);
-	const [detailExamName, setDetailExamName] = useState("");
+	const [detailExamKind, setDetailExamKind] = useState<string>(ADMIN_DEFAULT_EXAM_KIND);
+	const [detailExamDetail, setDetailExamDetail] = useState("");
+	const [detailExamDate, setDetailExamDate] = useState("");
 	const [detailExamScoreInput, setDetailExamScoreInput] = useState("");
 	const [detailExamGradeInput, setDetailExamGradeInput] = useState("");
 	const [detailExamSubmitting, setDetailExamSubmitting] = useState(false);
@@ -235,7 +242,9 @@ export default function AdminPage() {
 	const [detailExamFormMessage, setDetailExamFormMessage] = useState("");
 	const [isDeletingMemoId, setIsDeletingMemoId] = useState<number | null>(null);
 	const [detailExamEditingId, setDetailExamEditingId] = useState<number | null>(null);
-	const [detailEditExamName, setDetailEditExamName] = useState("");
+	const [detailEditExamKind, setDetailEditExamKind] = useState<string>(ADMIN_DEFAULT_EXAM_KIND);
+	const [detailEditExamDetail, setDetailEditExamDetail] = useState("");
+	const [detailEditExamDate, setDetailEditExamDate] = useState("");
 	const [detailEditExamScore, setDetailEditExamScore] = useState("");
 	const [detailEditExamGrade, setDetailEditExamGrade] = useState("");
 	const [detailExamMutateError, setDetailExamMutateError] = useState("");
@@ -765,14 +774,18 @@ export default function AdminPage() {
 		setModalResetPassword("");
 		setModalPasswordError("");
 		setModalPasswordMessage("");
-		setDetailExamName("");
+		setDetailExamKind(ADMIN_DEFAULT_EXAM_KIND);
+		setDetailExamDetail("");
+		setDetailExamDate("");
 		setDetailExamScoreInput("");
 		setDetailExamGradeInput("");
 		setDetailExamFormError("");
 		setDetailExamFormMessage("");
 		setIsDeletingMemoId(null);
 		setDetailExamEditingId(null);
-		setDetailEditExamName("");
+		setDetailEditExamKind(ADMIN_DEFAULT_EXAM_KIND);
+		setDetailEditExamDetail("");
+		setDetailEditExamDate("");
 		setDetailEditExamScore("");
 		setDetailEditExamGrade("");
 		setDetailExamMutateError("");
@@ -790,13 +803,17 @@ export default function AdminPage() {
 		setModalResetPassword("");
 		setModalPasswordError("");
 		setModalPasswordMessage("");
-		setDetailExamName("");
+		setDetailExamKind(ADMIN_DEFAULT_EXAM_KIND);
+		setDetailExamDetail("");
+		setDetailExamDate("");
 		setDetailExamScoreInput("");
 		setDetailExamGradeInput("");
 		setDetailExamFormError("");
 		setDetailExamFormMessage("");
 		setDetailExamEditingId(null);
-		setDetailEditExamName("");
+		setDetailEditExamKind(ADMIN_DEFAULT_EXAM_KIND);
+		setDetailEditExamDetail("");
+		setDetailEditExamDate("");
 		setDetailEditExamScore("");
 		setDetailEditExamGrade("");
 		setDetailExamMutateError("");
@@ -872,12 +889,15 @@ export default function AdminPage() {
 		setDetailExamFormError("");
 		setDetailExamFormMessage("");
 
-		const name = detailExamName.trim();
 		const score = Number.parseInt(detailExamScoreInput, 10);
 		const grade = Number.parseInt(detailExamGradeInput, 10);
 
-		if (!name) {
-			setDetailExamFormError("시험 이름을 입력해 주세요.");
+		if (!detailExamDate.trim()) {
+			setDetailExamFormError("응시일을 선택해 주세요.");
+			return;
+		}
+		if (detailExamKind === EXAM_KIND_OTHER && !detailExamDetail.trim()) {
+			setDetailExamFormError("사설/기타 선택 시 상세 시험 이름을 입력해 주세요.");
 			return;
 		}
 		if (!Number.isFinite(score) || !Number.isInteger(score)) {
@@ -895,7 +915,9 @@ export default function AdminPage() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				studentId: studentDetailModal.id,
-				examName: name,
+				examKind: detailExamKind,
+				examDetail: detailExamKind === EXAM_KIND_OTHER ? detailExamDetail.trim() : null,
+				examDate: detailExamDate.trim(),
 				score,
 				grade,
 			}),
@@ -908,7 +930,9 @@ export default function AdminPage() {
 			return;
 		}
 
-		setDetailExamName("");
+		setDetailExamKind(ADMIN_DEFAULT_EXAM_KIND);
+		setDetailExamDetail("");
+		setDetailExamDate("");
 		setDetailExamScoreInput("");
 		setDetailExamGradeInput("");
 		setDetailExamFormMessage("성적이 등록되었습니다.");
@@ -930,7 +954,10 @@ export default function AdminPage() {
 	const startDetailExamEdit = (row: ExamRecord) => {
 		setDetailExamMutateError("");
 		setDetailExamEditingId(row.id);
-		setDetailEditExamName(row.exam_name);
+		const kind = normalizeExamKindForForm(row.exam_kind);
+		setDetailEditExamKind(kind);
+		setDetailEditExamDetail(kind === EXAM_KIND_OTHER ? (row.exam_detail ?? row.exam_name).trim() : "");
+		setDetailEditExamDate(row.exam_date || "");
 		setDetailEditExamScore(String(row.score));
 		setDetailEditExamGrade(String(row.grade));
 	};
@@ -945,11 +972,14 @@ export default function AdminPage() {
 		if (!studentDetailModal || detailExamEditingId === null) return;
 		setDetailExamMutateError("");
 
-		const name = detailEditExamName.trim();
 		const score = Number.parseInt(detailEditExamScore, 10);
 		const grade = Number.parseInt(detailEditExamGrade, 10);
-		if (!name) {
-			setDetailExamMutateError("시험 이름을 입력해 주세요.");
+		if (!detailEditExamDate.trim()) {
+			setDetailExamMutateError("응시일을 선택해 주세요.");
+			return;
+		}
+		if (detailEditExamKind === EXAM_KIND_OTHER && !detailEditExamDetail.trim()) {
+			setDetailExamMutateError("사설/기타 선택 시 상세 시험 이름을 입력해 주세요.");
 			return;
 		}
 		if (!Number.isFinite(score) || !Number.isInteger(score)) {
@@ -967,7 +997,9 @@ export default function AdminPage() {
 			headers: { "Content-Type": "application/json" },
 			body: JSON.stringify({
 				id: detailExamEditingId,
-				examName: name,
+				examKind: detailEditExamKind,
+				examDetail: detailEditExamKind === EXAM_KIND_OTHER ? detailEditExamDetail.trim() : null,
+				examDate: detailEditExamDate.trim(),
 				score,
 				grade,
 			}),
@@ -1683,36 +1715,27 @@ export default function AdminPage() {
 								{!detailLoading && !detailExamError && detailExamRecords.length === 0 ? (
 									<p className="mt-2 text-sm text-zinc-500">등록된 성적이 없습니다.</p>
 								) : null}
-								<ul className="mt-2 max-h-44 space-y-2 overflow-y-auto">
+								<ExamTrendChart records={detailExamRecords} className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50/50 px-2 py-3" />
+								<ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
 									{detailExamRecords.map((row) => (
 										<li key={row.id} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
 											{detailExamEditingId === row.id ? (
 												<form className="space-y-2" onSubmit={handleDetailExamSaveEdit}>
-													<input
-														type="text"
-														value={detailEditExamName}
-														onChange={(e) => setDetailEditExamName(e.target.value)}
-														placeholder="예: 3월 교육청 모의고사"
-														className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
+													<ExamScoreFormFields
+														dense
+														examKind={detailEditExamKind}
+														onExamKindChange={setDetailEditExamKind}
+														examDetail={detailEditExamDetail}
+														onExamDetailChange={setDetailEditExamDetail}
+														examDate={detailEditExamDate}
+														onExamDateChange={setDetailEditExamDate}
+														scoreInput={detailEditExamScore}
+														onScoreInputChange={setDetailEditExamScore}
+														gradeInput={detailEditExamGrade}
+														onGradeInputChange={setDetailEditExamGrade}
+														selectId={`admin-exam-kind-${row.id}`}
+														dateId={`admin-exam-date-${row.id}`}
 													/>
-													<div className="grid grid-cols-2 gap-2">
-														<input
-															type="number"
-															inputMode="numeric"
-															value={detailEditExamScore}
-															onChange={(e) => setDetailEditExamScore(e.target.value)}
-															placeholder="점수"
-															className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
-														/>
-														<input
-															type="number"
-															inputMode="numeric"
-															value={detailEditExamGrade}
-															onChange={(e) => setDetailEditExamGrade(e.target.value)}
-															placeholder="등급"
-															className="w-full rounded-lg border border-zinc-300 px-2 py-1.5 text-xs outline-none focus:border-zinc-500"
-														/>
-													</div>
 													<div className="flex flex-wrap gap-1.5">
 														<button
 															type="submit"
@@ -1733,9 +1756,16 @@ export default function AdminPage() {
 											) : (
 												<>
 													<div className="flex justify-between gap-2">
-														<span className="font-medium text-zinc-900">{row.exam_name}</span>
+														<div className="min-w-0">
+															<span className="font-medium text-zinc-900">{row.exam_name}</span>
+															<p className="mt-0.5 text-[11px] text-zinc-500">
+																응시일{" "}
+																{row.exam_date ? toKoreanDate(`${row.exam_date}T12:00:00`) : "-"}
+															</p>
+														</div>
 														<div className="flex shrink-0 items-center gap-0.5">
-															<span className="text-xs text-zinc-500">{toKoreanDate(row.created_at)}</span>
+															<span className="sr-only">등록일</span>
+															<span className="text-[10px] text-zinc-400">{toKoreanDate(row.created_at)}</span>
 															<button
 																type="button"
 																onClick={() => startDetailExamEdit(row)}
@@ -1766,31 +1796,20 @@ export default function AdminPage() {
 
 								<form className="mt-4 space-y-2 border-t border-zinc-100 pt-4" onSubmit={handleAddStudentExam}>
 									<h4 className="text-xs font-semibold text-zinc-700">성적 추가</h4>
-									<input
-										type="text"
-										value={detailExamName}
-										onChange={(e) => setDetailExamName(e.target.value)}
-										placeholder="예: 3월 교육청 모의고사, 한수 모의고사 1회"
-										className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+									<ExamScoreFormFields
+										examKind={detailExamKind}
+										onExamKindChange={setDetailExamKind}
+										examDetail={detailExamDetail}
+										onExamDetailChange={setDetailExamDetail}
+										examDate={detailExamDate}
+										onExamDateChange={setDetailExamDate}
+										scoreInput={detailExamScoreInput}
+										onScoreInputChange={setDetailExamScoreInput}
+										gradeInput={detailExamGradeInput}
+										onGradeInputChange={setDetailExamGradeInput}
+										selectId="admin-add-exam-kind"
+										dateId="admin-add-exam-date"
 									/>
-									<div className="grid grid-cols-2 gap-2">
-										<input
-											type="number"
-											inputMode="numeric"
-											value={detailExamScoreInput}
-											onChange={(e) => setDetailExamScoreInput(e.target.value)}
-											placeholder="점수"
-											className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
-										/>
-										<input
-											type="number"
-											inputMode="numeric"
-											value={detailExamGradeInput}
-											onChange={(e) => setDetailExamGradeInput(e.target.value)}
-											placeholder="등급"
-											className="w-full rounded-xl border border-zinc-300 px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
-										/>
-									</div>
 									{detailExamFormError ? <p className="text-sm text-rose-600">{detailExamFormError}</p> : null}
 									{detailExamFormMessage ? <p className="text-sm text-emerald-700">{detailExamFormMessage}</p> : null}
 									<button

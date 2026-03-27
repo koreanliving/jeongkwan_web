@@ -7,6 +7,7 @@ import {
 } from "@/utils/examRecordsMemos";
 import { getStudentSession, isAdminRequest } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
+import type { ExamKind } from "@/utils/examKinds";
 import { isValidUuid } from "@/utils/uuidValidation";
 
 function parseStudentIdParam(searchParams: URLSearchParams): string | null {
@@ -84,7 +85,9 @@ export async function POST(request: NextRequest) {
 	try {
 		const body = (await request.json()) as {
 			studentId?: unknown;
-			examName?: unknown;
+			examKind?: unknown;
+			examDetail?: unknown;
+			examDate?: unknown;
 			score?: unknown;
 			grade?: unknown;
 		};
@@ -106,19 +109,34 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ message: "유효한 studentId가 필요합니다." }, { status: 400 });
 		}
 
-		const examName = typeof body.examName === "string" ? body.examName : "";
+		const examKind = typeof body.examKind === "string" ? body.examKind.trim() : "";
+		const examDetail =
+			body.examDetail === null || body.examDetail === undefined
+				? null
+				: typeof body.examDetail === "string"
+					? body.examDetail
+					: String(body.examDetail);
+		const examDate = typeof body.examDate === "string" ? body.examDate.trim() : "";
 		const score = typeof body.score === "number" ? body.score : Number(body.score);
 		const grade = typeof body.grade === "number" ? body.grade : Number(body.grade);
 
 		const result = await addExamRecord(supabaseAdmin, {
 			studentId,
-			examName,
+			examKind: examKind as ExamKind,
+			examDetail,
+			examDate,
 			score,
 			grade,
 		});
 
 		if (result.error) {
-			const status = result.error.includes("유효한 학생") || result.error.includes("입력") ? 400 : 500;
+			const msg = result.error;
+			const status =
+				msg.includes("42703") || msg.includes("column")
+					? 503
+					: msg.includes("유효한 학생") || msg.includes("입력") || msg.includes("선택") || msg.includes("시험") || msg.includes("응시")
+						? 400
+						: 500;
 			return NextResponse.json({ message: result.error }, { status });
 		}
 
@@ -132,7 +150,9 @@ export async function PATCH(request: NextRequest) {
 	try {
 		const body = (await request.json()) as {
 			id?: unknown;
-			examName?: unknown;
+			examKind?: unknown;
+			examDetail?: unknown;
+			examDate?: unknown;
 			score?: unknown;
 			grade?: unknown;
 		};
@@ -144,11 +164,24 @@ export async function PATCH(request: NextRequest) {
 		const access = await assertExamRecordAccess(request, id);
 		if (!access.ok) return access.response;
 
-		const examName = typeof body.examName === "string" ? body.examName : "";
+		const examKind = typeof body.examKind === "string" ? body.examKind.trim() : "";
+		const examDetail =
+			body.examDetail === null || body.examDetail === undefined
+				? null
+				: typeof body.examDetail === "string"
+					? body.examDetail
+					: String(body.examDetail);
+		const examDate = typeof body.examDate === "string" ? body.examDate.trim() : "";
 		const score = typeof body.score === "number" ? body.score : Number(body.score);
 		const grade = typeof body.grade === "number" ? body.grade : Number(body.grade);
 
-		const result = await updateExamRecord(supabaseAdmin, id, { examName, score, grade });
+		const result = await updateExamRecord(supabaseAdmin, id, {
+			examKind: examKind as ExamKind,
+			examDetail,
+			examDate,
+			score,
+			grade,
+		});
 		if (result.error) {
 			const status = result.error.includes("유효한") || result.error.includes("입력") ? 400 : 500;
 			return NextResponse.json({ message: result.error }, { status });
