@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { FileText, Home, MessageSquareText, Pencil, PlayCircle, Trash2, UserRound } from "lucide-react";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
-import { ExamTrendChart } from "@/components/ExamTrendChart";
+import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import { supabase } from "@/utils/supabase";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import type { ExamRecord } from "@/utils/examRecordsMemos";
@@ -324,7 +324,7 @@ export default function MyPage() {
 
 						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
 							<h2 className="text-base font-semibold text-zinc-900">성적 추이</h2>
-							<ExamTrendChart records={records} className="mt-3" />
+							<ExamTrendChartLazy records={records} className="mt-3" />
 						</section>
 
 						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">

@@ -4,7 +4,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
-import { ExamTrendChart } from "@/components/ExamTrendChart";
+import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import { supabase } from "../../utils/supabase";
@@ -1715,7 +1715,7 @@ export default function AdminPage() {
 								{!detailLoading && !detailExamError && detailExamRecords.length === 0 ? (
 									<p className="mt-2 text-sm text-zinc-500">등록된 성적이 없습니다.</p>
 								) : null}
-								<ExamTrendChart records={detailExamRecords} className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50/50 px-2 py-3" />
+								<ExamTrendChartLazy records={detailExamRecords} className="mt-3 rounded-xl border border-zinc-100 bg-zinc-50/50 px-2 py-3" />
 								<ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
 									{detailExamRecords.map((row) => (
 										<li key={row.id} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm">
