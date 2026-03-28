@@ -4,6 +4,9 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
+const fieldClass =
+	"w-full rounded-3xl border border-slate-200/90 bg-slate-100/90 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-brand/45 focus:bg-white focus:ring-2 focus:ring-brand/15";
+
 export default function LoginPage() {
 	const router = useRouter();
 	const [studentId, setStudentId] = useState("");
@@ -40,62 +43,69 @@ export default function LoginPage() {
 	};
 
 	return (
-		<main className="flex min-h-screen items-center justify-center bg-zinc-100 px-5 py-10 text-zinc-900">
-			<section className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.35)]">
-				<h1 className="text-center text-2xl font-bold tracking-tight">수강생 인증</h1>
-				<p className="mt-2 text-center text-sm text-zinc-500">학생 계정으로 로그인</p>
+		<main className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-app-sage px-5 py-10 text-slate-900">
+			<section className="w-full max-w-[22rem] rounded-[1.75rem] border border-slate-200/80 bg-white p-7 shadow-[0_24px_50px_-28px_rgba(30,58,138,0.18)] sm:max-w-sm sm:p-8">
+				<h1 className="text-center text-2xl font-bold tracking-tight text-brand">수강생 인증</h1>
+				<p className="mt-2 text-center text-sm font-medium text-slate-500">학생 계정으로 로그인</p>
 
-				<form className="mt-6 space-y-4" onSubmit={handleSubmit}>
-					<label className="block text-sm font-medium text-zinc-700" htmlFor="studentId">
-						학생 아이디
-					</label>
-					<input
-						id="studentId"
-						type="text"
-						value={studentId}
-						onChange={(event) => {
-							setStudentId(event.target.value);
-							setError("");
-						}}
-						placeholder="예: 2-03"
-						className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
-						required
-					/>
+				<form className="mt-8 space-y-4" onSubmit={handleSubmit}>
+					<div>
+						<label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="studentId">
+							학생 아이디
+						</label>
+						<input
+							id="studentId"
+							type="text"
+							value={studentId}
+							onChange={(event) => {
+								setStudentId(event.target.value);
+								setError("");
+							}}
+							placeholder="예: 2-03"
+							className={fieldClass}
+							required
+						/>
+					</div>
 
-					<label className="block text-sm font-medium text-zinc-700" htmlFor="password">
-						비밀번호
-					</label>
-					<input
-						id="password"
-						type="password"
-						value={password}
-						onChange={(event) => {
-							setPassword(event.target.value);
-							setError("");
-						}}
-						placeholder="비밀번호를 입력하세요"
-						className="w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
-						required
-					/>
+					<div>
+						<label className="mb-1.5 block text-xs font-semibold text-slate-600" htmlFor="password">
+							비밀번호
+						</label>
+						<input
+							id="password"
+							type="password"
+							value={password}
+							onChange={(event) => {
+								setPassword(event.target.value);
+								setError("");
+							}}
+							placeholder="비밀번호를 입력하세요"
+							className={fieldClass}
+							required
+						/>
+					</div>
 
-					{error ? <p className="text-sm text-rose-600">{error}</p> : null}
+					{error ? (
+						<p className="rounded-2xl border border-rose-200/90 bg-rose-50 px-3 py-2.5 text-center text-sm text-rose-700">{error}</p>
+					) : null}
 
 					<button
 						type="submit"
 						disabled={isSubmitting}
-						className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
+						className="mt-2 w-full rounded-3xl bg-brand py-3.5 text-sm font-bold text-white shadow-md shadow-brand/25 transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 					>
-						{isSubmitting ? "확인 중..." : "확인"}
+						{isSubmitting ? "확인 중..." : "로그인"}
 					</button>
 				</form>
 
-				<div className="mt-4 flex flex-col items-center gap-2 text-center">
-					<p className="text-xs text-zinc-500">계정이 없으신가요?</p>
-					<Link href="/auth/signup" className="text-xs font-semibold text-zinc-700 underline underline-offset-2 hover:text-zinc-900">
-						회원가입 요청
+				<div className="mt-6 flex flex-col items-center gap-3 border-t border-slate-100 pt-6">
+					<Link
+						href="/auth/signup"
+						className="text-sm font-semibold text-brand transition hover:text-brand-hover hover:underline underline-offset-4"
+					>
+						회원가입
 					</Link>
-					<p className="mt-2 text-xs text-zinc-500">또는</p>
-					<Link href="/admin-login" className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">
+					<Link href="/admin-login" className="text-xs font-medium text-slate-400 transition hover:text-slate-600">
 						관리자 로그인
 					</Link>
 				</div>

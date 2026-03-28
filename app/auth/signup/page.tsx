@@ -9,6 +9,11 @@ const grades = ["중1", "중2", "중3", "고1", "고2", "고3", "N수"] as const
 
 type Academy = (typeof academies)[number];
 
+const fieldClass =
+	"w-full rounded-3xl border border-slate-200/90 bg-slate-100/90 px-4 py-3.5 text-sm text-slate-900 placeholder:text-slate-400 outline-none transition focus:border-brand/45 focus:bg-white focus:ring-2 focus:ring-brand/15";
+
+const labelClass = "mb-1.5 block text-xs font-semibold text-slate-600";
+
 export default function SignupPage() {
 	const [studentId, setStudentId] = useState("");
 	const [password, setPassword] = useState("");
@@ -27,8 +32,6 @@ export default function SignupPage() {
 	const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setError("");
-
-
 
 		if (!studentId.trim() || !password.trim() || !passwordConfirm.trim() || !studentName.trim() || !phone.trim()) {
 			setError("아이디, 비밀번호, 이름, 연락처는 필수입니다.");
@@ -83,18 +86,18 @@ export default function SignupPage() {
 
 	if (success) {
 		return (
-			<main className="flex min-h-screen items-center justify-center bg-zinc-100 px-5 py-10 text-zinc-900">
-				<section className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.35)]">
+			<main className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-app-sage px-5 py-10 text-slate-900">
+				<section className="w-full max-w-[22rem] rounded-[1.75rem] border border-slate-200/80 bg-white p-7 shadow-[0_24px_50px_-28px_rgba(30,58,138,0.18)] sm:max-w-sm sm:p-8">
 					<div className="flex justify-center">
-						<CheckCircle2 className="h-12 w-12 text-emerald-600" />
+						<CheckCircle2 className="h-12 w-12 text-brand" strokeWidth={2} />
 					</div>
-					<h1 className="mt-4 text-center text-xl font-bold tracking-tight">가입 신청이 접수되었습니다</h1>
-					<p className="mt-3 text-center text-sm text-zinc-600">
+					<h1 className="mt-4 text-center text-xl font-bold tracking-tight text-brand">가입 신청이 접수되었습니다</h1>
+					<p className="mt-3 text-center text-sm font-medium leading-relaxed text-slate-600">
 						관리자 검토 후 로그인 계정이 생성되면 알려드립니다. 잠시만 기다려 주세요.
 					</p>
 					<Link
 						href="/login"
-						className="mt-6 block rounded-2xl bg-brand px-4 py-3 text-center text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
+						className="mt-8 block w-full rounded-3xl bg-brand py-3.5 text-center text-sm font-bold text-white shadow-md shadow-brand/25 transition hover:bg-brand-hover active:bg-brand-active"
 					>
 						로그인 페이지로 돌아가기
 					</Link>
@@ -104,14 +107,15 @@ export default function SignupPage() {
 	}
 
 	return (
-		<main className="flex min-h-screen items-center justify-center bg-zinc-100 px-5 py-10 text-zinc-900">
-			<section className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-[0_20px_45px_-30px_rgba(0,0,0,0.35)]">
-				<h1 className="text-center text-2xl font-bold tracking-tight">가입 신청</h1>
-				<p className="mt-2 text-center text-sm text-zinc-500">아래 정보를 입력하면 관리자 검토 후 계정을 만들어드립니다.</p>
+		<main className="flex min-h-screen min-h-[100dvh] items-center justify-center bg-app-sage px-5 py-10 pb-14 text-slate-900">
+			<section className="w-full max-w-[22rem] rounded-[1.75rem] border border-slate-200/80 bg-white p-7 shadow-[0_24px_50px_-28px_rgba(30,58,138,0.18)] sm:max-w-sm sm:p-8">
+				<h1 className="text-center text-2xl font-bold tracking-tight text-brand">회원가입</h1>
+				<p className="mt-2 text-center text-sm font-medium text-slate-500">수능국어 학습을 시작하세요</p>
+				<p className="mt-1 text-center text-xs text-slate-400">아래 정보를 입력하면 관리자 검토 후 계정을 만들어드립니다.</p>
 
-				<form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+				<form className="mt-8 space-y-4" onSubmit={handleSubmit}>
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="studentId">
+						<label className={labelClass} htmlFor="studentId">
 							아이디
 						</label>
 						<input
@@ -123,12 +127,12 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="예: honggildong01"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 							required
 						/>
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="password">
+						<label className={labelClass} htmlFor="password">
 							비밀번호
 						</label>
 						<input
@@ -140,12 +144,12 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="비밀번호 (6자 이상)"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 							required
 						/>
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="passwordConfirm">
+						<label className={labelClass} htmlFor="passwordConfirm">
 							비밀번호 확인
 						</label>
 						<input
@@ -157,12 +161,12 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="비밀번호 재입력"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 							required
 						/>
 					</div>
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="studentName">
+						<label className={labelClass} htmlFor="studentName">
 							학생 이름
 						</label>
 						<input
@@ -174,20 +178,20 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="홍길동"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 							required
 						/>
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="academy">
+						<label className={labelClass} htmlFor="academy">
 							수강 학원
 						</label>
 						<select
 							id="academy"
 							value={academy}
 							onChange={(event) => setAcademy(event.target.value as Academy)}
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 						>
 							{academies.map((opt) => (
 								<option key={opt} value={opt}>
@@ -198,7 +202,7 @@ export default function SignupPage() {
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="phone">
+						<label className={labelClass} htmlFor="phone">
 							연락처
 						</label>
 						<input
@@ -210,21 +214,16 @@ export default function SignupPage() {
 								setError("");
 							}}
 							placeholder="010-1234-5678"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 							required
 						/>
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="grade">
+						<label className={labelClass} htmlFor="grade">
 							학년
 						</label>
-						<select
-							id="grade"
-							value={grade}
-							onChange={(event) => setGrade(event.target.value)}
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
-						>
+						<select id="grade" value={grade} onChange={(event) => setGrade(event.target.value)} className={fieldClass}>
 							{grades.map((opt) => (
 								<option key={opt} value={opt}>
 									{opt}
@@ -234,7 +233,7 @@ export default function SignupPage() {
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="recentTest">
+						<label className={labelClass} htmlFor="recentTest">
 							최근 모의고사
 						</label>
 						<input
@@ -243,12 +242,12 @@ export default function SignupPage() {
 							value={recentTest}
 							onChange={(event) => setRecentTest(event.target.value)}
 							placeholder="2025년 3월 전국 모의고사 (선택)"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 						/>
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="recentGrade">
+						<label className={labelClass} htmlFor="recentGrade">
 							등급
 						</label>
 						<input
@@ -257,12 +256,12 @@ export default function SignupPage() {
 							value={recentGrade}
 							onChange={(event) => setRecentGrade(event.target.value)}
 							placeholder="2등급 (선택)"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 						/>
 					</div>
 
 					<div>
-						<label className="block text-sm font-medium text-zinc-700" htmlFor="selectedSubject">
+						<label className={labelClass} htmlFor="selectedSubject">
 							선택과목
 						</label>
 						<input
@@ -271,12 +270,12 @@ export default function SignupPage() {
 							value={selectedSubject}
 							onChange={(event) => setSelectedSubject(event.target.value)}
 							placeholder="언어와 매체, 화법과 작문 (선택)"
-							className="mt-1 w-full rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm outline-none transition focus:border-zinc-500 focus:ring-2 focus:ring-zinc-200"
+							className={fieldClass}
 						/>
 					</div>
 
 					{error ? (
-						<div className="flex gap-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3">
+						<div className="flex gap-2 rounded-2xl border border-rose-200/90 bg-rose-50 px-4 py-3">
 							<AlertCircle className="h-5 w-5 shrink-0 text-rose-600" />
 							<p className="text-sm text-rose-700">{error}</p>
 						</div>
@@ -285,15 +284,15 @@ export default function SignupPage() {
 					<button
 						type="submit"
 						disabled={isSubmitting}
-						className="w-full rounded-2xl bg-brand px-4 py-3 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
+						className="mt-2 w-full rounded-3xl bg-brand py-3.5 text-sm font-bold text-white shadow-md shadow-brand/25 transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
 					>
-						{isSubmitting ? "신청 중..." : "가입 신청하기"}
+						{isSubmitting ? "처리 중..." : "회원가입"}
 					</button>
 				</form>
 
-				<div className="mt-4 text-center">
-					<Link href="/login" className="text-xs font-medium text-zinc-500 underline underline-offset-2 hover:text-zinc-700">
-						로그인 페이지로 돌아가기
+				<div className="mt-6 border-t border-slate-100 pt-6 text-center">
+					<Link href="/login" className="text-sm font-semibold text-slate-500 transition hover:text-brand">
+						로그인
 					</Link>
 				</div>
 			</section>
