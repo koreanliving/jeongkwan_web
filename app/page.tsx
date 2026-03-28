@@ -179,7 +179,19 @@ export default function HomePage() {
 
 	return (
 		<main className="relative min-h-screen min-h-[100dvh] bg-app-sage pb-[calc(5.75rem+env(safe-area-inset-bottom))]">
-			<div className="app-home-top border-b border-slate-200/80 py-10 sm:py-12 md:py-14 pt-[max(0.5rem,env(safe-area-inset-top))]">
+			<div className="border-b border-slate-200/80 bg-white pt-[max(0.5rem,env(safe-area-inset-top))] pb-3">
+				<div className={`${STUDENT_APP_SHELL}`}>
+					<div
+						className="rounded-2xl bg-gradient-to-r from-brand to-brand-hover px-4 py-3.5 text-center shadow-md shadow-brand/25 sm:py-4"
+						role="note"
+						aria-label="브랜드 안내"
+					>
+						<p className="text-base font-bold tracking-tight text-white sm:text-lg">수능국어는 이정관</p>
+					</div>
+				</div>
+			</div>
+
+			<div className="app-home-top border-b border-slate-200/80 py-10 sm:py-12 md:py-14 pt-6 sm:pt-8">
 				<div className={`${STUDENT_APP_SHELL}`}>
 					<div className="flex items-center gap-4 sm:gap-5">
 						<div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand sm:h-[4.5rem] sm:w-[4.5rem]">
