@@ -42,7 +42,6 @@ type AnnouncementItem = {
 
 type HomeSetting = {
 	id: number;
-	welcome_title: string;
 	show_post_dates: boolean;
 };
 
@@ -183,7 +182,6 @@ export default function AdminPage() {
 	const [isDeletingMaterialId, setIsDeletingMaterialId] = useState<number | null>(null);
 	const [isDeletingVideoId, setIsDeletingVideoId] = useState<number | null>(null);
 
-	const [homeTitle, setHomeTitle] = useState("강의실에 오신 것을 환영합니다!");
 	const [showPostDates, setShowPostDates] = useState(true);
 	const [isSavingMain, setIsSavingMain] = useState(false);
 	const [mainMessage, setMainMessage] = useState("");
@@ -311,7 +309,7 @@ export default function AdminPage() {
 				.order("created_at", { ascending: false })
 				.limit(100),
 			supabase.from("announcements").select("id, title, content, created_at").order("created_at", { ascending: false }).limit(30),
-			supabase.from("home_settings").select("id, welcome_title, show_post_dates").eq("id", 1).maybeSingle(),
+			supabase.from("home_settings").select("id, show_post_dates").eq("id", 1).maybeSingle(),
 		]);
 
 		if (materialResult.error || videoResult.error || announcementResult.error) {
@@ -325,7 +323,6 @@ export default function AdminPage() {
 
 		if (settingResult.data) {
 			const setting = settingResult.data as HomeSetting;
-			setHomeTitle(setting.welcome_title || "강의실에 오신 것을 환영합니다!");
 			setShowPostDates(setting.show_post_dates ?? true);
 		}
 
@@ -591,21 +588,14 @@ export default function AdminPage() {
 		event.preventDefault();
 		setMainError("");
 		setMainMessage("");
-		if (!homeTitle.trim()) {
-			setMainError("환영 문구 제목을 입력해 주세요.");
-			return;
-		}
 		setIsSavingMain(true);
-		const { error } = await supabase.from("home_settings").upsert(
-			{ id: 1, welcome_title: homeTitle.trim(), welcome_subtitle: "", show_post_dates: showPostDates },
-			{ onConflict: "id" },
-		);
+		const { error } = await supabase.from("home_settings").update({ show_post_dates: showPostDates }).eq("id", 1);
 		if (error) {
-			setMainError("메인 설정 저장에 실패했습니다.");
+			setMainError("표시 설정 저장에 실패했습니다.");
 			setIsSavingMain(false);
 			return;
 		}
-		setMainMessage("메인 설정이 저장되었습니다.");
+		setMainMessage("표시 설정이 저장되었습니다.");
 		setIsSavingMain(false);
 	};
 
@@ -1411,10 +1401,9 @@ export default function AdminPage() {
 				{activeTab === "main" ? (
 					<>
 						<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
-							<h2 className="text-lg font-semibold text-zinc-900">메인 환영 문구 설정</h2>
-							<p className="mt-1 text-xs text-zinc-500">홈 화면 상단 배너에 한 줄 제목만 표시됩니다.</p>
+							<h2 className="text-lg font-semibold text-zinc-900">표시 설정</h2>
+							<p className="mt-1 text-xs text-zinc-500">홈·자료·영상 등 목록에 날짜를 보일지 정합니다.</p>
 							<form className="mt-4 space-y-3" onSubmit={handleSaveMainSetting}>
-								<input type="text" value={homeTitle} onChange={(e) => setHomeTitle(e.target.value)} placeholder="예: 2026년에도 정관T와 함께" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 								<label className="flex items-center gap-2 rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2.5 text-sm text-zinc-700">
 									<input type="checkbox" checked={showPostDates} onChange={(e) => setShowPostDates(e.target.checked)} className="h-4 w-4" />
 									게시물 날짜 표기 켜기
@@ -1422,7 +1411,7 @@ export default function AdminPage() {
 								{mainError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{mainError}</p> : null}
 								{mainMessage ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{mainMessage}</p> : null}
 								<button type="submit" disabled={isSavingMain} className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45">
-									<Save className="h-4 w-4" />{isSavingMain ? "저장 중..." : "메인 문구 저장"}
+									<Save className="h-4 w-4" />{isSavingMain ? "저장 중..." : "표시 설정 저장"}
 								</button>
 							</form>
 						</section>
