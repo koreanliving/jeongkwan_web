@@ -3,6 +3,16 @@ import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { createSupabaseAuthWithCookieCapture } from "@/utils/server/supabaseAuthCookies";
 
+const STUDENT_AUTH_COOKIE_NAME = "student_auth";
+
+const studentGateCookieOptions = {
+	path: "/",
+	maxAge: 60 * 60 * 24 * 7,
+	sameSite: "lax" as const,
+	httpOnly: true,
+	secure: process.env.NODE_ENV === "production",
+};
+
 export async function POST(request: NextRequest) {
 	try {
 		const body = (await request.json()) as { studentId?: string; password?: string };
@@ -36,6 +46,7 @@ export async function POST(request: NextRequest) {
 			await supabase.auth.signOut();
 			const res = NextResponse.json({ message: "프로필 정보를 찾을 수 없습니다. 관리자에게 문의해 주세요." }, { status: 403 });
 			applyCookies(res);
+			res.cookies.set(STUDENT_AUTH_COOKIE_NAME, "", { ...studentGateCookieOptions, maxAge: 0 });
 			return res;
 		}
 
@@ -46,11 +57,13 @@ export async function POST(request: NextRequest) {
 				{ status: 403 },
 			);
 			applyCookies(res);
+			res.cookies.set(STUDENT_AUTH_COOKIE_NAME, "", { ...studentGateCookieOptions, maxAge: 0 });
 			return res;
 		}
 
 		const ok = NextResponse.json({ ok: true });
 		applyCookies(ok);
+		ok.cookies.set(STUDENT_AUTH_COOKIE_NAME, "true", studentGateCookieOptions);
 		return ok;
 	} catch {
 		return NextResponse.json({ message: "요청 처리 중 오류가 발생했습니다." }, { status: 400 });

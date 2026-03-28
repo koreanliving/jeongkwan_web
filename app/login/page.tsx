@@ -25,6 +25,7 @@ export default function LoginPage() {
 		});
 
 		if (response.ok) {
+			setIsSubmitting(false);
 			router.replace("/");
 			return;
 		}
