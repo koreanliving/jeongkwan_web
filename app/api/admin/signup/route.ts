@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
 		if (body.action === "approve") {
 			const { data: signupData, error: fetchError } = await supabaseAdmin
 				.from("signup_requests")
-				.select("id, student_id, student_name, phone, password, academy")
+				.select("id, student_id, student_name, phone, password, academy, grade")
 				.eq("id", body.id)
 				.maybeSingle();
 
@@ -75,6 +75,8 @@ export async function POST(request: NextRequest) {
 
 			const userId = created.user.id;
 
+			const gradeSnap = String(signupData.grade ?? "").trim() || null;
+
 			const { error: profileError } = await supabaseAdmin.from("profiles").insert({
 				id: userId,
 				username,
@@ -82,6 +84,9 @@ export async function POST(request: NextRequest) {
 				academy,
 				phone,
 				is_approved: true,
+				signup_grade: gradeSnap,
+				target_university: null,
+				target_department: null,
 			});
 
 			if (profileError) {

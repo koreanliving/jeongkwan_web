@@ -2,8 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Paperclip } from "lucide-react";
+import { FileText, Paperclip } from "lucide-react";
 import { BottomTabNav } from "@/components/BottomTabNav";
+import { AppTopBar } from "@/components/AppTopBar";
+import { StudentCategoryTabs } from "@/components/StudentCategoryTabs";
+import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -31,6 +34,19 @@ function toKoreanDate(value: string) {
 		month: "long",
 		day: "numeric",
 	});
+}
+
+function MaterialRowSkeleton() {
+	return (
+		<li className={`flex items-center gap-3 ${studentComicCard} animate-pulse p-3`}>
+			<div className="h-11 w-11 shrink-0 rounded-xl bg-slate-200" />
+			<div className="min-w-0 flex-1 space-y-2">
+				<div className="h-4 w-[60%] max-w-[14rem] rounded bg-slate-200" />
+				<div className="h-3 w-[40%] max-w-[8rem] rounded bg-slate-100" />
+			</div>
+			<div className="h-8 w-14 shrink-0 rounded-full bg-slate-200" />
+		</li>
+	);
 }
 
 export default function MaterialPage() {
@@ -90,88 +106,76 @@ export default function MaterialPage() {
 	}, [activeTab]);
 
 	return (
-		<main className="min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
-			<div className="mx-auto w-full max-w-sm">
-				<header>
-					<div className="flex items-center justify-between gap-3">
-						<h1 className="text-3xl font-bold tracking-tight text-zinc-900">자료실</h1>
-						{isAdminUi ? (
-							<Link
-								href="/admin"
-								className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-50"
-							>
-								관리
-							</Link>
-						) : null}
-					</div>
-					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
-						{categoryTabs.map((tab) => (
-							<button
-								key={tab}
-								type="button"
-								onClick={() => setActiveTab(tab)}
-								className={`min-h-11 rounded-xl px-3 text-sm font-semibold transition ${
-									activeTab === tab
-										? "bg-brand text-white shadow-sm"
-										: "bg-transparent text-zinc-600 hover:bg-white/80"
-								}`}
-							>
-								{tab}
-							</button>
+		<main className="min-h-screen min-h-[100dvh] bg-app-sage pb-[calc(5.75rem+env(safe-area-inset-bottom))] text-slate-800">
+			<AppTopBar
+				title="학습 자료"
+				right={
+					isAdminUi ? (
+						<Link
+							href="/admin"
+							className="rounded-full border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-semibold tracking-tight text-slate-900 shadow-sm transition hover:bg-slate-50"
+						>
+							관리
+						</Link>
+					) : null
+				}
+			/>
+
+			<div className={`${STUDENT_APP_SHELL} space-y-4 pt-3 sm:space-y-5 sm:pt-4`}>
+				<StudentCategoryTabs tabs={categoryTabs} active={activeTab} onChange={setActiveTab} />
+
+				{isLoading ? (
+					<ul className="space-y-3">
+						{Array.from({ length: 6 }).map((_, i) => (
+							<MaterialRowSkeleton key={i} />
 						))}
-					</div>
-				</header>
+					</ul>
+				) : null}
 
-				<section className="mt-6 space-y-4">
-					{isLoading ? (
-						<p className="rounded-2xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							데이터를 불러오는 중입니다...
-						</p>
-					) : null}
+				{!isLoading && errorMessage ? (
+					<p className={`${studentComicCard} border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800`}>
+						{errorMessage}
+					</p>
+				) : null}
 
-					{!isLoading && errorMessage ? (
-						<p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-							{errorMessage}
-						</p>
-					) : null}
+				{!isLoading && !errorMessage && materials.length === 0 ? (
+					<p className={`${studentComicCard} px-4 py-10 text-center text-sm font-medium text-slate-500`}>등록된 자료가 없습니다.</p>
+				) : null}
 
-					{!isLoading && !errorMessage && materials.length === 0 ? (
-						<p className="rounded-2xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							등록된 자료가 없습니다.
-						</p>
-					) : null}
-
-					{!isLoading && !errorMessage
-						? materials.map((material) => (
-								<Link
-									key={material.id}
-									href={`/material/${material.id}`}
-									className="block rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-20px_rgba(0,0,0,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400"
-								>
-									<article>
-										<div className="flex items-start justify-between gap-3">
-											<h2 className="text-base font-semibold leading-snug text-zinc-900">{material.title}</h2>
-											<div className="flex items-center gap-1.5">
-												{material.file_name ? (
-													<span className="inline-flex items-center gap-1 rounded-full border border-zinc-300 bg-zinc-100 px-2 py-1 text-[11px] font-medium text-zinc-600">
-														<Paperclip className="h-3 w-3" />
-														PDF
-													</span>
-												) : null}
-												<span className="shrink-0 whitespace-nowrap rounded-full bg-brand px-2.5 py-1 text-xs font-medium leading-none text-white">
-													{material.category}
+				{!isLoading && !errorMessage && materials.length > 0 ? (
+					<ul className="space-y-3">
+						{materials.map((material) => (
+							<li key={material.id}>
+								<div className={`flex items-center gap-3 ${studentComicCard} p-3 sm:p-3.5`}>
+									<div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/10 text-brand">
+										<FileText className="h-5 w-5" strokeWidth={2} />
+									</div>
+									<div className="min-w-0 flex-1">
+										<p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">{material.category}</p>
+										<h2 className="mt-0.5 line-clamp-2 text-sm font-semibold leading-snug text-slate-900 sm:text-[15px]">
+											{material.title}
+										</h2>
+										<div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] text-slate-500">
+											{showPostDates ? <span>{toKoreanDate(material.created_at)}</span> : null}
+											{material.file_name ? (
+												<span className="inline-flex items-center gap-1 text-slate-600">
+													<Paperclip className="h-3 w-3 shrink-0" />
+													PDF
 												</span>
-											</div>
+											) : null}
 										</div>
-										{showPostDates ? <p className="mt-2 text-xs text-zinc-500">{toKoreanDate(material.created_at)}</p> : null}
-										<p className="mt-3 line-clamp-3 text-sm leading-relaxed text-zinc-700">
-											{material.subtitle || material.content.trim() || (material.file_name ? "PDF 첨부 자료입니다. 상세 페이지에서 바로 볼 수 있습니다." : "")}
-										</p>
-									</article>
-								</Link>
-							))
-						: null}
-				</section>
+									</div>
+									<Link
+										href={`/material/${material.id}`}
+										className="shrink-0 touch-manipulation rounded-full bg-brand px-3.5 py-2 text-xs font-semibold text-white shadow-sm shadow-brand/20 transition hover:bg-brand-hover active:scale-[0.98] sm:px-4"
+									>
+										열기
+									</Link>
+								</div>
+							</li>
+						))}
+					</ul>
+				) : null}
 			</div>
 
 			<BottomTabNav active="material" />

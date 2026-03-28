@@ -1,8 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BottomTabNav } from "@/components/BottomTabNav";
+import { AppTopBar } from "@/components/AppTopBar";
+import { StudentCategoryTabs } from "@/components/StudentCategoryTabs";
+import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
+import { getYoutubeThumbnailUrl } from "@/lib/youtube";
 import { supabase } from "../../utils/supabase";
+import { Play, Search } from "lucide-react";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
 
@@ -29,32 +34,9 @@ function toKoreanDate(value: string) {
 	});
 }
 
-function getYoutubeEmbedUrl(videoUrl: string) {
-	try {
-		const parsed = new URL(videoUrl);
-
-		if (parsed.hostname.includes("youtu.be")) {
-			const videoId = parsed.pathname.replace("/", "");
-			return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-		}
-
-		if (parsed.hostname.includes("youtube.com")) {
-			if (parsed.pathname.startsWith("/embed/")) {
-				return videoUrl;
-			}
-
-			const videoId = parsed.searchParams.get("v");
-			return videoId ? `https://www.youtube.com/embed/${videoId}` : null;
-		}
-
-		return null;
-	} catch {
-		return null;
-	}
-}
-
 export default function VideoPage() {
 	const [activeTab, setActiveTab] = useState<CategoryTab>("전체");
+	const [sortDesc, setSortDesc] = useState(true);
 	const [videos, setVideos] = useState<VideoItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
@@ -108,82 +90,104 @@ export default function VideoPage() {
 		};
 	}, [activeTab]);
 
+	const sortedVideos = useMemo(() => {
+		const v = [...videos];
+		v.sort((a, b) => {
+			const t = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+			return sortDesc ? -t : t;
+		});
+		return v;
+	}, [videos, sortDesc]);
+
 	return (
-		<main className="min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
-			<div className="mx-auto w-full max-w-sm">
-				<header>
-					<h1 className="text-3xl font-bold tracking-tight text-zinc-900">영상</h1>
-					<div className="mt-4 grid grid-cols-3 gap-2 rounded-2xl bg-zinc-200/70 p-1.5">
-						{categoryTabs.map((tab) => (
-							<button
-								key={tab}
-								type="button"
-								onClick={() => setActiveTab(tab)}
-								className={`min-h-11 rounded-xl px-3 text-sm font-semibold transition ${
-									activeTab === tab
-										? "bg-brand text-white shadow-sm"
-										: "bg-transparent text-zinc-600 hover:bg-white/80"
-								}`}
-							>
-								{tab}
-							</button>
-						))}
+		<main className="min-h-screen min-h-[100dvh] bg-app-sage pb-[calc(5.75rem+env(safe-area-inset-bottom))] text-zinc-800">
+			<AppTopBar
+				title="영상 자료"
+				right={
+					<button
+						type="button"
+						className="comic-border flex h-9 w-9 touch-manipulation items-center justify-center rounded-full bg-white text-zinc-900 shadow-sm transition hover:bg-zinc-50 active:translate-x-px active:translate-y-px active:shadow-none"
+						aria-label="목록으로 이동"
+						onClick={() => document.getElementById("video-list")?.scrollIntoView({ behavior: "smooth" })}
+					>
+						<Search className="h-4 w-4" strokeWidth={2.5} />
+					</button>
+				}
+			/>
+
+			<div className={`${STUDENT_APP_SHELL} space-y-4 pt-3 sm:space-y-5 sm:pt-4`}>
+				<StudentCategoryTabs tabs={categoryTabs} active={activeTab} onChange={setActiveTab} />
+
+				{isLoading ? (
+					<p className={`${studentComicCard} px-4 py-10 text-center text-sm font-bold tracking-tight text-zinc-500`}>
+						데이터를 불러오는 중입니다...
+					</p>
+				) : null}
+
+				{!isLoading && errorMessage ? (
+					<p className={`${studentComicCard} border-rose-300 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800`}>
+						{errorMessage}
+					</p>
+				) : null}
+
+				{!isLoading && !errorMessage && videos.length === 0 ? (
+					<p className={`${studentComicCard} px-4 py-10 text-center text-sm font-bold tracking-tight text-zinc-500`}>
+						등록된 영상이 없습니다.
+					</p>
+				) : null}
+
+				<section id="video-list" className="scroll-mt-4">
+					<div className="mb-3 flex items-center justify-between gap-2">
+						<h2 className="text-base font-extrabold tracking-tight text-zinc-900">전체 목록</h2>
+						<select
+							value={sortDesc ? "latest" : "oldest"}
+							onChange={(e) => setSortDesc(e.target.value === "latest")}
+							className="rounded-xl border border-zinc-200/90 bg-white px-2 py-1.5 text-xs font-semibold tracking-tight text-zinc-800 shadow-sm outline-none transition focus:border-brand/40 focus:ring-2 focus:ring-brand/20"
+						>
+							<option value="latest">최신순</option>
+							<option value="oldest">오래된순</option>
+						</select>
 					</div>
-				</header>
-
-				<section className="mt-6 space-y-4">
-					{isLoading ? (
-						<p className="rounded-2xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							데이터를 불러오는 중입니다...
-						</p>
-					) : null}
-
-					{!isLoading && errorMessage ? (
-						<p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-							{errorMessage}
-						</p>
-					) : null}
-
-					{!isLoading && !errorMessage && videos.length === 0 ? (
-						<p className="rounded-2xl border border-zinc-200 bg-white px-4 py-8 text-center text-sm text-zinc-600 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							등록된 영상이 없습니다.
-						</p>
-					) : null}
-
-					{!isLoading && !errorMessage
-						? videos.map((video) => {
-								const embedUrl = getYoutubeEmbedUrl(video.video_url);
-
-								return (
-									<article
-										key={video.id}
-										className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]"
+					<ul className="space-y-3">
+						{sortedVideos.map((video) => {
+							const thumb = getYoutubeThumbnailUrl(video.video_url);
+							return (
+								<li key={video.id}>
+									<a
+										href={video.video_url}
+										target="_blank"
+										rel="noreferrer"
+										className="group flex gap-3 rounded-2xl border border-zinc-200/90 bg-white p-3 shadow-md transition hover:translate-x-px hover:translate-y-px hover:shadow-sm md:gap-4 md:p-4"
 									>
-										<div>
-											<h2 className="text-lg font-semibold text-zinc-900">{video.title}</h2>
-											{showPostDates ? <p className="mt-1 text-sm text-zinc-500">{toKoreanDate(video.created_at)}</p> : null}
-										</div>
-
-										<div className="mt-4 overflow-hidden rounded-2xl border border-zinc-200 bg-zinc-100">
-											{embedUrl ? (
-												<iframe
-													title={`${video.title} 유튜브 영상`}
-													src={embedUrl}
-													className="aspect-video w-full"
-													allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-													referrerPolicy="strict-origin-when-cross-origin"
-													allowFullScreen
-												/>
+										<div className="relative h-24 w-36 shrink-0 overflow-hidden rounded-lg border border-zinc-200/90 bg-zinc-200 md:h-28 md:w-44">
+											{thumb ? (
+												// eslint-disable-next-line @next/next/no-img-element
+												<img src={thumb} alt="" className="h-full w-full object-cover transition group-hover:scale-105" />
 											) : (
-												<div className="flex aspect-video w-full items-center justify-center text-sm text-zinc-500">
-													유효한 유튜브 링크가 아닙니다.
+												<div className="flex h-full w-full items-center justify-center bg-zinc-300 text-zinc-500">
+													<Play className="h-8 w-8" />
 												</div>
 											)}
+											<span className="absolute bottom-1.5 right-1.5 rounded-md bg-black/75 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+												재생
+											</span>
+											<div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 transition group-hover:opacity-100">
+												<Play className="h-10 w-10 text-white drop-shadow-md" strokeWidth={2.5} />
+											</div>
 										</div>
-									</article>
-								);
-							})
-						: null}
+										<div className="flex min-w-0 flex-1 flex-col justify-center">
+											<span className="text-[10px] font-extrabold tracking-tight text-zinc-600">{video.category}</span>
+											<p className="mt-0.5 line-clamp-2 text-sm font-extrabold tracking-tight text-zinc-900">{video.title}</p>
+											<p className="mt-1 text-xs text-zinc-500">
+												{showPostDates ? `${toKoreanDate(video.created_at)} · ` : null}
+												유튜브에서 보기
+											</p>
+										</div>
+									</a>
+								</li>
+							);
+						})}
+					</ul>
 				</section>
 			</div>
 

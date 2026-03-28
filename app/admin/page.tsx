@@ -54,6 +54,9 @@ type StudentItem = {
 	phone: string;
 	is_approved: boolean;
 	created_at: string;
+	signup_grade?: string | null;
+	target_university?: string | null;
+	target_department?: string | null;
 };
 
 type StudentRequestItem = {
@@ -1514,7 +1517,16 @@ export default function AdminPage() {
 										<div className="flex items-start justify-between gap-2">
 											<div>
 												<p className="text-sm font-medium text-zinc-900">{student.name} (<b>{student.username}</b>)</p>
-												<p className="mt-0.5 text-xs text-zinc-500">{student.academy} · {student.phone}</p>
+												<p className="mt-0.5 text-xs text-zinc-500">
+													학원 {student.academy} · 연락처 {student.phone}
+													{student.signup_grade ? ` · 학년 ${student.signup_grade}` : ""}
+												</p>
+												{student.target_university || student.target_department ? (
+													<p className="mt-0.5 text-xs text-brand">
+														목표대학 {student.target_university?.trim() || "—"}
+														{student.target_department ? ` · ${student.target_department}` : ""}
+													</p>
+												) : null}
 												<p className="mt-0.5 text-xs text-zinc-500">가입일: {toKoreanDate(student.created_at)}</p>
 											</div>
 											<span className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-zinc-200/80 px-2 py-1 text-[10px] font-semibold text-zinc-600">
@@ -1649,7 +1661,7 @@ export default function AdminPage() {
 							</div>
 
 							<section className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
-								<h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-500">기본 정보</h3>
+								<h3 className="text-xs font-semibold text-zinc-500">기본 정보</h3>
 								<dl className="mt-2 space-y-1 text-sm">
 									<div className="flex justify-between gap-2">
 										<dt className="text-zinc-500">이름</dt>
@@ -1662,6 +1674,18 @@ export default function AdminPage() {
 									<div className="flex justify-between gap-2">
 										<dt className="text-zinc-500">학원</dt>
 										<dd className="text-zinc-900">{studentDetailModal.academy}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">학년</dt>
+										<dd className="text-zinc-900">{studentDetailModal.signup_grade?.trim() || "—"}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">목표대학</dt>
+										<dd className="text-right text-zinc-900">{studentDetailModal.target_university?.trim() || "—"}</dd>
+									</div>
+									<div className="flex justify-between gap-2">
+										<dt className="text-zinc-500">희망학과</dt>
+										<dd className="text-right text-zinc-900">{studentDetailModal.target_department?.trim() || "—"}</dd>
 									</div>
 									<div className="flex justify-between gap-2">
 										<dt className="text-zinc-500">연락처</dt>

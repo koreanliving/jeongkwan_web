@@ -2,8 +2,10 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2 } from "lucide-react";
+import { Bell, Pencil, Trash2 } from "lucide-react";
+import { AppTopBar } from "@/components/AppTopBar";
 import { BottomTabNav } from "@/components/BottomTabNav";
+import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import { supabase } from "@/utils/supabase";
@@ -39,7 +41,18 @@ export default function MyPage() {
 	const [message, setMessage] = useState("");
 	const [showPostDates, setShowPostDates] = useState(true);
 	const [studentLabel, setStudentLabel] = useState("");
-	const [studentInfo, setStudentInfo] = useState<{ academy: string; grade: string | null } | null>(null);
+	const [studentInfo, setStudentInfo] = useState<{
+		academy: string;
+		grade: string | null;
+		targetUniversity: string;
+		targetDepartment: string;
+	} | null>(null);
+	const [showExamModal, setShowExamModal] = useState(false);
+	const [showGoalModal, setShowGoalModal] = useState(false);
+	const [goalUniv, setGoalUniv] = useState("");
+	const [goalDept, setGoalDept] = useState("");
+	const [goalSaving, setGoalSaving] = useState(false);
+	const [goalError, setGoalError] = useState("");
 	const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
 	const [editExamKind, setEditExamKind] = useState<string>(DEFAULT_EXAM_KIND);
 	const [editExamDetail, setEditExamDetail] = useState("");
@@ -74,7 +87,14 @@ export default function MyPage() {
 
 		const reqRes = await fetch("/api/requests", { cache: "no-store" });
 		const reqData = (await reqRes.json()) as {
-			student?: { id: string; name: string; academy?: string; grade?: string | null };
+			student?: {
+				id: string;
+				name: string;
+				academy?: string;
+				grade?: string | null;
+				targetUniversity?: string;
+				targetDepartment?: string;
+			};
 		};
 
 		if (!reqRes.ok || !reqData.student) {
@@ -88,10 +108,16 @@ export default function MyPage() {
 
 		setAuth("user");
 		setStudentLabel(`${reqData.student.name} (${reqData.student.id})`);
+		const tu = (reqData.student.targetUniversity ?? "").trim();
+		const td = (reqData.student.targetDepartment ?? "").trim();
 		setStudentInfo({
 			academy: reqData.student.academy ?? "-",
 			grade: reqData.student.grade ?? null,
+			targetUniversity: tu,
+			targetDepartment: td,
 		});
+		setGoalUniv(tu);
+		setGoalDept(td);
 
 		const exRes = await fetch("/api/exam-records", { cache: "no-store" });
 		const exData = (await exRes.json()) as {
@@ -184,7 +210,40 @@ export default function MyPage() {
 		setGradeInput("");
 		setMessage("성적이 등록되었습니다.");
 		setIsSubmitting(false);
+		setShowExamModal(false);
 		await loadExamRecords();
+	};
+
+	const handleGoalSave = async (event: FormEvent) => {
+		event.preventDefault();
+		setGoalError("");
+		setGoalSaving(true);
+		const response = await fetch("/api/student/profile", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				targetUniversity: goalUniv.trim(),
+				targetDepartment: goalDept.trim(),
+			}),
+		});
+		const result = (await response.json()) as { message?: string };
+		setGoalSaving(false);
+
+		if (!response.ok) {
+			setGoalError(result.message ?? "저장에 실패했습니다.");
+			return;
+		}
+
+		setStudentInfo((prev) =>
+			prev
+				? {
+						...prev,
+						targetUniversity: goalUniv.trim(),
+						targetDepartment: goalDept.trim(),
+					}
+				: prev,
+		);
+		setShowGoalModal(false);
 	};
 
 	const startEditRecord = (row: ExamRecord) => {
@@ -273,21 +332,35 @@ export default function MyPage() {
 		await loadExamRecords();
 	};
 
+	const displayName = studentLabel.split(" (")[0] || "";
+	const profileInitial = (displayName || "학").charAt(0);
+
 	return (
-		<main className="relative min-h-screen bg-zinc-100 px-5 pb-28 pt-8 text-zinc-800">
-			<div className="mx-auto w-full max-w-sm">
-				<header className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-					<h1 className="text-2xl font-bold tracking-tight text-zinc-900">마이페이지</h1>
-					<p className="mt-2 text-sm text-zinc-600">나의 성적을 확인하고 기록할 수 있습니다.</p>
-					{studentLabel ? <p className="mt-2 text-xs text-zinc-500">현재 사용자: {studentLabel}</p> : null}
-				</header>
+		<main className="relative min-h-screen min-h-[100dvh] bg-app-sage pb-[calc(5.75rem+env(safe-area-inset-bottom))] text-zinc-800">
+			<AppTopBar
+				title="마이페이지"
+				right={
+					<Link
+						href="/#announcements"
+						className="comic-border flex h-9 w-9 touch-manipulation items-center justify-center rounded-full bg-white text-zinc-900 shadow-sm transition hover:bg-zinc-50"
+						aria-label="공지사항"
+					>
+						<Bell className="h-4 w-4" strokeWidth={2.5} />
+					</Link>
+				}
+			/>
+
+			<div className={`${STUDENT_APP_SHELL} space-y-4 pt-3 sm:space-y-5 sm:pt-4`}>
+				<p className={`${studentComicCard} p-4 text-sm font-semibold tracking-tight text-zinc-700`}>
+					나의 성적을 확인하고 기록할 수 있습니다.
+				</p>
 
 				{auth === "guest" ? (
-					<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+					<section className={`${studentComicCard} p-5 md:p-6`}>
 						<p className="text-sm text-zinc-600">성적을 보려면 학생 로그인이 필요합니다.</p>
 						<Link
 							href="/login"
-							className="mt-4 inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active"
+							className="mt-4 inline-flex min-h-11 touch-manipulation items-center rounded-xl bg-brand px-5 text-sm font-semibold tracking-tight text-white shadow-md shadow-brand/20 transition hover:bg-brand-hover active:scale-[0.99]"
 						>
 							로그인하기
 						</Link>
@@ -295,70 +368,87 @@ export default function MyPage() {
 				) : null}
 
 				{auth === "unknown" ? (
-					<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
+					<section className={`${studentComicCard} p-5 md:p-6`}>
 						<p className="text-sm text-zinc-600">불러오는 중입니다…</p>
 					</section>
 				) : null}
 
 				{auth === "user" ? (
 					<>
-						{studentInfo ? (
-							<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-								<h2 className="text-base font-semibold text-zinc-900">학생 정보</h2>
-								<dl className="mt-3 space-y-2 text-sm">
-									<div className="flex justify-between gap-3 border-b border-zinc-100 pb-2">
-										<dt className="text-zinc-500">수강 학원</dt>
-										<dd className="text-right font-medium text-zinc-900">{studentInfo.academy}</dd>
+						<section className={`${studentComicCard} p-5 md:p-6`}>
+							<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+								<div className="flex items-center gap-4">
+									<div className="comic-border flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-zinc-100 text-2xl font-extrabold tracking-tight text-zinc-900 md:h-20 md:w-20 md:text-3xl">
+										{profileInitial}
 									</div>
-									<div className="flex justify-between gap-3">
-										<dt className="text-zinc-500">학년</dt>
-										<dd className="text-right font-medium text-zinc-900">
-											{studentInfo.grade ?? "가입 신청 시 기록 없음"}
-										</dd>
+									<div className="min-w-0">
+										<p className="text-lg font-bold text-zinc-900">{displayName || "학생"}</p>
+										{studentLabel ? <p className="mt-0.5 text-xs text-zinc-500">{studentLabel}</p> : null}
+										{studentInfo ? (
+											<ul className="mt-2 space-y-1 text-xs text-zinc-600">
+												<li>
+													<span className="font-semibold text-zinc-500">수강 학원</span> {studentInfo.academy}
+												</li>
+												<li>
+													<span className="font-semibold text-zinc-500">학년</span> {studentInfo.grade ?? "—"}
+												</li>
+												<li>
+													<span className="font-semibold text-zinc-500">목표대학</span>{" "}
+													{studentInfo.targetUniversity || "미입력"}
+												</li>
+												<li>
+													<span className="font-semibold text-zinc-500">희망학과</span>{" "}
+													{studentInfo.targetDepartment || "미입력"}
+												</li>
+											</ul>
+										) : null}
+									</div>
+								</div>
+								<dl className="flex shrink-0 gap-6 rounded-xl border border-zinc-200/90 bg-zinc-50 px-4 py-3 text-center shadow-sm sm:flex-col sm:gap-1 sm:text-left">
+									<div>
+										<dt className="text-[10px] font-extrabold tracking-tight text-zinc-500">등록 성적</dt>
+										<dd className="text-lg font-extrabold tracking-tight text-zinc-900">{records.length}건</dd>
 									</div>
 								</dl>
-								<p className="mt-3 text-xs text-zinc-500">
-									학원은 프로필 기준이며, 학년은 승인된 가입 신청에 적힌 값을 보여 줍니다.
-								</p>
-							</section>
-						) : null}
+							</div>
+							<p className="mt-4 text-xs text-zinc-500">학원·학년은 가입 정보를 기준으로 표시됩니다.</p>
+							<div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+								<button
+									type="button"
+									onClick={() => {
+										setGoalError("");
+										setGoalUniv(studentInfo?.targetUniversity ?? "");
+										setGoalDept(studentInfo?.targetDepartment ?? "");
+										setShowGoalModal(true);
+									}}
+									className="inline-flex min-h-12 touch-manipulation items-center justify-center rounded-xl border border-zinc-200/90 bg-white px-4 text-sm font-extrabold tracking-tight text-zinc-900 shadow-md transition hover:bg-zinc-50 active:translate-x-px active:translate-y-px active:shadow-sm"
+								>
+									목표대학
+								</button>
+								<button
+									type="button"
+									onClick={() => {
+										setError("");
+										setMessage("");
+										setShowExamModal(true);
+									}}
+									className="inline-flex min-h-12 touch-manipulation items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold tracking-tight text-white shadow-md shadow-brand/20 transition hover:bg-brand-hover active:scale-[0.99]"
+								>
+									성적 등록
+								</button>
+							</div>
+							{message ? (
+								<p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
+							) : null}
+						</section>
 
-						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							<h2 className="text-base font-semibold text-zinc-900">성적 추이</h2>
+						<section className={`${studentComicCard} p-5 md:p-6`}>
+							<h2 className="text-base font-extrabold tracking-tight text-zinc-900">성적 추이</h2>
 							<ExamTrendChartLazy records={records} className="mt-3" />
 						</section>
 
-						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							<h2 className="text-base font-semibold text-zinc-900">성적 추가</h2>
-							<form className="mt-3 space-y-3" onSubmit={handleSubmit}>
-								<ExamScoreFormFields
-									examKind={examKind}
-									onExamKindChange={setExamKind}
-									examDetail={examDetail}
-									onExamDetailChange={setExamDetail}
-									examDate={examDate}
-									onExamDateChange={setExamDate}
-									scoreInput={scoreInput}
-									onScoreInputChange={setScoreInput}
-									gradeInput={gradeInput}
-									onGradeInputChange={setGradeInput}
-									selectId="mypage-exam-kind"
-									dateId="mypage-exam-date"
-								/>
-								{error ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p> : null}
-								{message ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p> : null}
-								<button
-									type="submit"
-									disabled={isSubmitting}
-									className="inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-45"
-								>
-									{isSubmitting ? "등록 중..." : "성적 등록"}
-								</button>
-							</form>
-						</section>
-
-						<section className="mt-5 rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-22px_rgba(0,0,0,0.35)]">
-							<h2 className="text-base font-semibold text-zinc-900">내 성적</h2>
+						<section className={`${studentComicCard} p-5 md:p-6`}>
+							<h2 className="text-base font-extrabold tracking-tight text-zinc-900">내 성적</h2>
 							{isLoading ? <p className="mt-3 text-sm text-zinc-600">불러오는 중입니다…</p> : null}
 							{!isLoading && error ? <p className="mt-3 text-sm text-rose-600">{error}</p> : null}
 							{recordMutateError ? (
@@ -371,7 +461,10 @@ export default function MyPage() {
 							) : null}
 							<ul className="mt-3 space-y-2">
 								{records.map((row) => (
-									<li key={row.id} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-3 py-3">
+									<li
+										key={row.id}
+										className="rounded-xl border border-zinc-200/90 bg-zinc-50 px-3 py-3 shadow-sm transition hover:bg-white"
+									>
 										{editingRecordId === row.id ? (
 											<form className="space-y-2" onSubmit={saveEditRecord}>
 												<ExamScoreFormFields
@@ -449,6 +542,128 @@ export default function MyPage() {
 					</>
 				) : null}
 			</div>
+
+			{auth === "user" && showGoalModal ? (
+				<div
+					className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="goal-modal-title"
+					onClick={() => setShowGoalModal(false)}
+				>
+					<div
+						className="card-float w-full max-w-md rounded-[1.25rem] border border-zinc-200 bg-white p-5 shadow-xl"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<h2 id="goal-modal-title" className="text-lg font-bold text-zinc-900">
+							목표대학·희망학과
+						</h2>
+						<p className="mt-1 text-xs text-zinc-500">수능 이후 지원 계획에 맞게 수정할 수 있습니다.</p>
+						<form className="mt-4 space-y-3" onSubmit={handleGoalSave}>
+							<div>
+								<label htmlFor="goal-univ" className="text-xs font-semibold text-zinc-500">
+									목표대학
+								</label>
+								<input
+									id="goal-univ"
+									type="text"
+									value={goalUniv}
+									onChange={(e) => setGoalUniv(e.target.value)}
+									placeholder="예: 서울대학교"
+									className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none transition focus:border-brand"
+								/>
+							</div>
+							<div>
+								<label htmlFor="goal-dept" className="text-xs font-semibold text-zinc-500">
+									희망학과
+								</label>
+								<input
+									id="goal-dept"
+									type="text"
+									value={goalDept}
+									onChange={(e) => setGoalDept(e.target.value)}
+									placeholder="예: 국어국문학과"
+									className="mt-1 w-full rounded-xl border border-zinc-200 px-3 py-2.5 text-sm outline-none transition focus:border-brand"
+								/>
+							</div>
+							{goalError ? (
+								<p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{goalError}</p>
+							) : null}
+							<div className="flex flex-wrap gap-2 pt-1">
+								<button
+									type="submit"
+									disabled={goalSaving}
+									className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl bg-brand px-4 text-sm font-bold text-white transition hover:bg-brand-hover disabled:opacity-45"
+								>
+									{goalSaving ? "저장 중…" : "저장"}
+								</button>
+								<button
+									type="button"
+									onClick={() => setShowGoalModal(false)}
+									className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+								>
+									닫기
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
+
+			{auth === "user" && showExamModal ? (
+				<div
+					className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+					role="dialog"
+					aria-modal="true"
+					aria-labelledby="exam-modal-title"
+					onClick={() => !isSubmitting && setShowExamModal(false)}
+				>
+					<div
+						className="card-float max-h-[90vh] w-full max-w-md overflow-y-auto rounded-[1.25rem] border border-zinc-200 bg-white p-5 shadow-xl"
+						onClick={(e) => e.stopPropagation()}
+					>
+						<h2 id="exam-modal-title" className="text-lg font-bold text-zinc-900">
+							성적 등록
+						</h2>
+						<form className="mt-4 space-y-3" onSubmit={handleSubmit}>
+							<ExamScoreFormFields
+								examKind={examKind}
+								onExamKindChange={setExamKind}
+								examDetail={examDetail}
+								onExamDetailChange={setExamDetail}
+								examDate={examDate}
+								onExamDateChange={setExamDate}
+								scoreInput={scoreInput}
+								onScoreInputChange={setScoreInput}
+								gradeInput={gradeInput}
+								onGradeInputChange={setGradeInput}
+								selectId="mypage-exam-kind-modal"
+								dateId="mypage-exam-date-modal"
+							/>
+							{error ? (
+								<p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</p>
+							) : null}
+							<div className="flex flex-wrap gap-2 pt-1">
+								<button
+									type="submit"
+									disabled={isSubmitting}
+									className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl bg-brand px-4 text-sm font-bold text-white transition hover:bg-brand-hover disabled:opacity-45"
+								>
+									{isSubmitting ? "등록 중..." : "등록하기"}
+								</button>
+								<button
+									type="button"
+									disabled={isSubmitting}
+									onClick={() => setShowExamModal(false)}
+									className="inline-flex min-h-10 items-center justify-center rounded-xl border border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:opacity-50"
+								>
+									닫기
+								</button>
+							</div>
+						</form>
+					</div>
+				</div>
+			) : null}
 
 			<BottomTabNav active="mypage" />
 		</main>

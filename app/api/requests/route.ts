@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 
 	const { data: profileRow } = await supabaseAdmin
 		.from("profiles")
-		.select("academy")
+		.select("academy, signup_grade, target_university, target_department")
 		.eq("id", session.userId)
 		.maybeSingle();
 
@@ -41,14 +41,20 @@ export async function GET(request: NextRequest) {
 		.maybeSingle();
 
 	const academy = (profileRow?.academy as string | undefined)?.trim() || "-";
-	const gradeFromSignup = (signupGradeRow?.grade as string | undefined)?.trim() || null;
+	const gradeFromProfile = (profileRow?.signup_grade as string | undefined)?.trim() || null;
+	const gradeFromSignupTable = (signupGradeRow?.grade as string | undefined)?.trim() || null;
+	const grade = gradeFromProfile || gradeFromSignupTable || null;
+	const targetUniversity = ((profileRow?.target_university as string | undefined) ?? "").trim();
+	const targetDepartment = ((profileRow?.target_department as string | undefined) ?? "").trim();
 
 	return NextResponse.json({
 		student: {
 			id: session.username,
 			name: session.name,
 			academy,
-			grade: gradeFromSignup,
+			grade,
+			targetUniversity,
+			targetDepartment,
 		},
 		userId: session.userId,
 		requests: data ?? [],

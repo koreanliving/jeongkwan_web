@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide-react";
+import { STUDENT_APP_SHELL } from "@/lib/appShell";
 
 const TABS = [
 	{ id: "home" as const, label: "홈", href: "/", Icon: Home },
@@ -19,8 +20,8 @@ type BottomTabNavProps = {
 
 export function BottomTabNav({ active }: BottomTabNavProps) {
 	return (
-		<nav className="fixed inset-x-0 bottom-0 z-10 border-t border-zinc-200/70 bg-white/92 pb-[calc(env(safe-area-inset-bottom)+0.55rem)] pt-2.5 shadow-[0_-6px_28px_-12px_rgba(43,91,63,0.07)] backdrop-blur-lg">
-			<ul className="mx-auto grid w-full max-w-sm grid-cols-5 gap-1 px-2">
+		<nav className="fixed inset-x-0 bottom-0 z-10 touch-manipulation border-t border-slate-200/90 bg-white pb-[calc(env(safe-area-inset-bottom)+0.5rem)] pt-2 shadow-[0_-4px_24px_-8px_rgba(15,23,42,0.06)]">
+			<ul className={`${STUDENT_APP_SHELL} grid w-full grid-cols-5 gap-0.5`}>
 				{TABS.map(({ id, label, href, Icon }) => {
 					const isActive = active === id;
 					return (
@@ -28,17 +29,17 @@ export function BottomTabNav({ active }: BottomTabNavProps) {
 							<Link
 								href={href}
 								aria-current={isActive ? "page" : undefined}
-								className={`flex w-full flex-col items-center justify-center gap-0.5 rounded-xl py-2.5 text-[11px] transition-colors ${
-									isActive
-										? "font-semibold text-brand"
-										: "font-medium text-nav-muted hover:text-zinc-600"
+								className={`flex w-full flex-col items-center justify-center gap-1 rounded-xl py-1.5 text-[10px] font-medium transition sm:text-[11px] ${
+									isActive ? "text-brand" : "text-slate-400 hover:text-slate-600"
 								}`}
 							>
-								<Icon
-									className="h-5 w-5 shrink-0"
-									strokeWidth={isActive ? 2.35 : 2}
-									aria-hidden
-								/>
+								<span
+									className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${
+										isActive ? "bg-brand/10 text-brand" : "text-slate-400"
+									}`}
+								>
+									<Icon className="h-5 w-5 shrink-0" strokeWidth={isActive ? 2.25 : 2} aria-hidden />
+								</span>
 								<span>{label}</span>
 							</Link>
 						</li>
