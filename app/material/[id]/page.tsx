@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, type ComponentPropsWithoutRef, useMemo, useState } from "react";
+import { useCallback, useEffect, type ComponentPropsWithoutRef, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -78,67 +78,21 @@ function parseReadingPairs(raw: string): Array<{ original: string; commentary: s
 	return result;
 }
 
-// ─── 읽기 연습 툴팁 컴포넌트 ────────────────────────────────────────────────────
-function ReadingTooltip({ original, commentary }: { original: string; commentary: string }) {
-	const [hovered, setHovered] = useState(false);
-	const [pinned, setPinned] = useState(false);
-	const [above, setAbove] = useState(false);
-	const tooltipRef = useRef<HTMLDivElement>(null);
-	const visible = hovered || pinned;
-
-	useEffect(() => {
-		if (!visible || !tooltipRef.current) return;
-		const rect = tooltipRef.current.getBoundingClientRect();
-		setAbove(rect.bottom > window.innerHeight - 24);
-	}, [visible]);
-
-	const handleClick = useCallback((e: React.MouseEvent) => {
-		e.stopPropagation();
-		setPinned((p) => !p);
-	}, []);
-
-	if (!commentary) {
-		return <span className="font-medium leading-relaxed text-zinc-900">{original}</span>;
-	}
-
-	return (
-		<span
-			className="relative inline cursor-help"
-			onMouseEnter={() => setHovered(true)}
-			onMouseLeave={() => setHovered(false)}
-			onClick={handleClick}
-		>
-			<span className="rounded border-b-2 border-dashed border-zinc-400 font-medium leading-relaxed text-zinc-900 transition-colors hover:border-brand hover:text-brand">
-				{original}
-			</span>
-			<span
-				ref={tooltipRef}
-				role="tooltip"
-				className={[
-					"pointer-events-none absolute left-0 z-50 w-72 max-w-[min(18rem,80vw)] rounded-2xl bg-zinc-800 px-4 py-3 text-sm leading-relaxed text-white shadow-2xl transition-all duration-200",
-					above ? "bottom-full mb-2" : "top-full mt-2",
-					visible ? "opacity-100" : "opacity-0",
-				].join(" ")}
-			>
-				<span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400">해설</span>
-				<span className="block whitespace-pre-wrap">{commentary}</span>
-				<span
-					className={[
-						"pointer-events-none absolute h-2 w-2 rotate-45 bg-zinc-800",
-						above
-							? "bottom-[-4px] left-4"
-							: "left-4 top-[-4px]",
-					].join(" ")}
-					aria-hidden
-				/>
-			</span>
-		</span>
-	);
-}
-
 // ─── 읽기 연습 뷰 ────────────────────────────────────────────────────────────────
 function ReadingPracticeView({ content }: { content: string }) {
 	const pairs = useMemo(() => parseReadingPairs(content), [content]);
+	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+	const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
+
+	const activeIndex = hoverIndex ?? pinnedIndex;
+	const activePair = activeIndex !== null ? pairs[activeIndex] : null;
+
+	const handleClick = useCallback(
+		(i: number) => {
+			setPinnedIndex((prev) => (prev === i ? null : i));
+		},
+		[],
+	);
 
 	if (pairs.length === 0) {
 		return (
@@ -150,22 +104,95 @@ function ReadingPracticeView({ content }: { content: string }) {
 
 	return (
 		<section className="mt-6">
-			<div className="mb-4 flex items-center gap-2">
+			{/* 안내 배지 */}
+			<div className="mb-4 flex flex-wrap items-center gap-2">
 				<span className="rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-bold tracking-widest text-brand">
 					읽기 연습
 				</span>
 				<p className="text-xs text-zinc-500">
-					{pairs.length}개 문장 · 밑줄 텍스트에 마우스를 올리거나 탭하면 해설이 표시됩니다
+					{pairs.length}개 문장 · 문장을 탭하거나 마우스를 올리면 아래에 해설이 나타납니다
 				</p>
 			</div>
-			<div className="rounded-2xl border border-zinc-200/90 bg-white p-4 text-base leading-8 tracking-tight text-zinc-900 shadow-sm sm:p-6 sm:text-lg sm:leading-9">
-				{pairs.map((pair, i) => (
-					<span key={i}>
-						<ReadingTooltip original={pair.original} commentary={pair.commentary} />
-						{i < pairs.length - 1 ? " " : ""}
-					</span>
-				))}
+
+			{/* 문장 카드 목록 */}
+			<div className="space-y-4">
+				{pairs.map((pair, i) => {
+					const isActive = activeIndex === i;
+					const isPinned = pinnedIndex === i;
+					return (
+						<div
+							key={i}
+							role="button"
+							tabIndex={0}
+							aria-expanded={isActive}
+							className={[
+								"cursor-pointer select-none rounded-2xl border-2 px-4 py-4 text-base font-medium leading-relaxed tracking-tight transition-all duration-150 sm:px-5 sm:text-lg",
+								isActive
+									? "border-brand bg-brand/5 text-brand shadow-md shadow-brand/10"
+									: "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:shadow-sm",
+								isPinned ? "ring-2 ring-brand/30 ring-offset-1" : "",
+							].join(" ")}
+							onMouseEnter={() => setHoverIndex(i)}
+							onMouseLeave={() => setHoverIndex(null)}
+							onClick={() => handleClick(i)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") handleClick(i);
+							}}
+						>
+							<span className="mr-2.5 inline-block rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 tabular-nums">
+								{i + 1}
+							</span>
+							{pair.original}
+							{pair.commentary ? (
+								<span
+									className={[
+										"ml-2 inline-block align-middle text-[10px] font-bold transition-colors",
+										isActive ? "text-brand" : "text-zinc-400",
+									].join(" ")}
+									aria-hidden
+								>
+									해설 {isPinned ? "▲" : "▼"}
+								</span>
+							) : null}
+						</div>
+					);
+				})}
 			</div>
+
+			{/* 하단 고정 해설 패널 */}
+			<div
+				className={[
+					"fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(32rem,94vw)] -translate-x-1/2 transition-all duration-300",
+					activePair?.commentary
+						? "pointer-events-auto translate-y-0 opacity-100"
+						: "pointer-events-none translate-y-4 opacity-0",
+				].join(" ")}
+				role="status"
+				aria-live="polite"
+			>
+				<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
+					{/* 헤더 */}
+					<div className="mb-2.5 flex items-center gap-2">
+						<span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+							해설
+						</span>
+						{activeIndex !== null ? (
+							<span className="text-[10px] font-bold text-zinc-500">
+								문장 {activeIndex + 1}
+							</span>
+						) : null}
+					</div>
+					{/* 해설 본문 */}
+					<p className="whitespace-pre-wrap text-sm font-medium leading-7 tracking-tight text-white sm:text-base sm:leading-8">
+						{activePair?.commentary ?? ""}
+					</p>
+				</div>
+				{/* 패널 꼭지 */}
+				<div className="mx-auto h-1 w-10 rounded-full bg-zinc-600/50 mt-1.5" aria-hidden />
+			</div>
+
+			{/* 해설 패널이 열렸을 때 아래쪽 여백 보정 */}
+			{activePair?.commentary ? <div className="h-40" aria-hidden /> : null}
 		</section>
 	);
 }
