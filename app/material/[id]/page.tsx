@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, type ComponentPropsWithoutRef, useMemo, useState } from "react";
+import { useCallback, useEffect, useRef, type ComponentPropsWithoutRef, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -17,6 +17,7 @@ type MaterialDetail = {
 	subtitle: string | null;
 	content: string;
 	category: "문학" | "비문학";
+	display_style: "standard" | "reading";
 	file_url: string | null;
 	file_name: string | null;
 	file_size: number | null;
@@ -59,6 +60,116 @@ function toKoreanDate(value: string) {
 	});
 }
 
+// ─── 읽기 연습 파서 ─────────────────────────────────────────────────────────────
+function parseReadingPairs(raw: string): Array<{ original: string; commentary: string }> {
+	const result: Array<{ original: string; commentary: string }> = [];
+	const blocks = raw.split("[원문]").filter((b) => b.trim());
+	for (const block of blocks) {
+		const sep = block.indexOf("[해설]");
+		if (sep === -1) {
+			const original = block.trim();
+			if (original) result.push({ original, commentary: "" });
+		} else {
+			const original = block.slice(0, sep).trim();
+			const commentary = block.slice(sep + "[해설]".length).trim();
+			if (original) result.push({ original, commentary });
+		}
+	}
+	return result;
+}
+
+// ─── 읽기 연습 툴팁 컴포넌트 ────────────────────────────────────────────────────
+function ReadingTooltip({ original, commentary }: { original: string; commentary: string }) {
+	const [hovered, setHovered] = useState(false);
+	const [pinned, setPinned] = useState(false);
+	const [above, setAbove] = useState(false);
+	const tooltipRef = useRef<HTMLDivElement>(null);
+	const visible = hovered || pinned;
+
+	useEffect(() => {
+		if (!visible || !tooltipRef.current) return;
+		const rect = tooltipRef.current.getBoundingClientRect();
+		setAbove(rect.bottom > window.innerHeight - 24);
+	}, [visible]);
+
+	const handleClick = useCallback((e: React.MouseEvent) => {
+		e.stopPropagation();
+		setPinned((p) => !p);
+	}, []);
+
+	if (!commentary) {
+		return <span className="font-medium leading-relaxed text-zinc-900">{original}</span>;
+	}
+
+	return (
+		<span
+			className="relative inline cursor-help"
+			onMouseEnter={() => setHovered(true)}
+			onMouseLeave={() => setHovered(false)}
+			onClick={handleClick}
+		>
+			<span className="rounded border-b-2 border-dashed border-zinc-400 font-medium leading-relaxed text-zinc-900 transition-colors hover:border-brand hover:text-brand">
+				{original}
+			</span>
+			<span
+				ref={tooltipRef}
+				role="tooltip"
+				className={[
+					"pointer-events-none absolute left-0 z-50 w-72 max-w-[min(18rem,80vw)] rounded-2xl bg-zinc-800 px-4 py-3 text-sm leading-relaxed text-white shadow-2xl transition-all duration-200",
+					above ? "bottom-full mb-2" : "top-full mt-2",
+					visible ? "opacity-100" : "opacity-0",
+				].join(" ")}
+			>
+				<span className="mb-1.5 block text-[10px] font-bold uppercase tracking-widest text-zinc-400">해설</span>
+				<span className="block whitespace-pre-wrap">{commentary}</span>
+				<span
+					className={[
+						"pointer-events-none absolute h-2 w-2 rotate-45 bg-zinc-800",
+						above
+							? "bottom-[-4px] left-4"
+							: "left-4 top-[-4px]",
+					].join(" ")}
+					aria-hidden
+				/>
+			</span>
+		</span>
+	);
+}
+
+// ─── 읽기 연습 뷰 ────────────────────────────────────────────────────────────────
+function ReadingPracticeView({ content }: { content: string }) {
+	const pairs = useMemo(() => parseReadingPairs(content), [content]);
+
+	if (pairs.length === 0) {
+		return (
+			<p className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
+				읽기 연습 콘텐츠를 불러올 수 없습니다. 관리자가 [원문]/[해설] 형식으로 입력했는지 확인해 주세요.
+			</p>
+		);
+	}
+
+	return (
+		<section className="mt-6">
+			<div className="mb-4 flex items-center gap-2">
+				<span className="rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-bold tracking-widest text-brand">
+					읽기 연습
+				</span>
+				<p className="text-xs text-zinc-500">
+					{pairs.length}개 문장 · 밑줄 텍스트에 마우스를 올리거나 탭하면 해설이 표시됩니다
+				</p>
+			</div>
+			<div className="rounded-2xl border border-zinc-200/90 bg-white p-4 text-base leading-8 tracking-tight text-zinc-900 shadow-sm sm:p-6 sm:text-lg sm:leading-9">
+				{pairs.map((pair, i) => (
+					<span key={i}>
+						<ReadingTooltip original={pair.original} commentary={pair.commentary} />
+						{i < pairs.length - 1 ? " " : ""}
+					</span>
+				))}
+			</div>
+		</section>
+	);
+}
+
 export default function MaterialDetailPage() {
 	const params = useParams<{ id: string }>();
 	const materialId = Number(params.id);
@@ -89,7 +200,7 @@ export default function MaterialDetailPage() {
 			const [materialResult, settingResult] = await Promise.all([
 				supabase
 					.from("materials")
-					.select("id, title, subtitle, content, category, file_url, file_name, file_size, created_at")
+					.select("id, title, subtitle, content, category, display_style, file_url, file_name, file_size, created_at")
 					.eq("id", materialId)
 					.single(),
 				supabase.from("home_settings").select("id, show_post_dates").eq("id", 1).maybeSingle(),
@@ -177,7 +288,9 @@ export default function MaterialDetailPage() {
 							) : null}
 						</header>
 
-						{isParsedView ? (
+						{material.display_style === "reading" ? (
+							<ReadingPracticeView content={material.content} />
+						) : isParsedView ? (
 							<section className="mt-6">
 								<div className="grid gap-4 sm:grid-cols-2">
 									{parsed.pairs.map((pair, index) => (

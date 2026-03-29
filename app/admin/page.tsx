@@ -151,6 +151,7 @@ export default function AdminPage() {
 	const [subtitle, setSubtitle] = useState("");
 	const [category, setCategory] = useState<Category>("문학");
 	const [content, setContent] = useState("");
+	const [displayStyle, setDisplayStyle] = useState<"standard" | "reading">("standard");
 	const [newFile, setNewFile] = useState<File | null>(null);
 	const [showPreview, setShowPreview] = useState(false);
 
@@ -163,6 +164,7 @@ export default function AdminPage() {
 	const [editSubtitle, setEditSubtitle] = useState("");
 	const [editCategory, setEditCategory] = useState<Category>("문학");
 	const [editContent, setEditContent] = useState("");
+	const [editDisplayStyle, setEditDisplayStyle] = useState<"standard" | "reading">("standard");
 	const [editOriginalFileUrl, setEditOriginalFileUrl] = useState<string | null>(null);
 	const [editOriginalFileName, setEditOriginalFileName] = useState<string | null>(null);
 	const [editNewFile, setEditNewFile] = useState<File | null>(null);
@@ -367,14 +369,15 @@ export default function AdminPage() {
 		}
 
 		setIsCreating(true);
-		const { data: inserted, error: insertError } = await supabase
-			.from("materials")
-			.insert({
-				title: title.trim(),
-				subtitle: subtitle.trim() || null,
-				content: content.trim(),
-				category,
-			})
+	const { data: inserted, error: insertError } = await supabase
+		.from("materials")
+		.insert({
+			title: title.trim(),
+			subtitle: subtitle.trim() || null,
+			content: content.trim(),
+			category,
+			display_style: displayStyle,
+		})
 			.select("id")
 			.single();
 
@@ -399,11 +402,12 @@ export default function AdminPage() {
 				}
 			}
 
-			setTitle("");
-			setSubtitle("");
-			setContent("");
-			setCategory("문학");
-			setNewFile(null);
+		setTitle("");
+		setSubtitle("");
+		setContent("");
+		setCategory("문학");
+		setDisplayStyle("standard");
+		setNewFile(null);
 			setShowPreview(false);
 			setCreateMessage("자료가 저장되었습니다.");
 			await fetchAdminData();
@@ -428,7 +432,7 @@ export default function AdminPage() {
 		setIsLoadingEditMaterial(true);
 		const { data, error } = await supabase
 			.from("materials")
-			.select("id, title, subtitle, content, category, file_url, file_name, file_size")
+			.select("id, title, subtitle, content, category, display_style, file_url, file_name, file_size")
 			.eq("id", material.id)
 			.single();
 		setIsLoadingEditMaterial(false);
@@ -441,6 +445,7 @@ export default function AdminPage() {
 		setEditSubtitle(data.subtitle ?? "");
 		setEditCategory((data.category as Category) || "문학");
 		setEditContent(typeof data.content === "string" ? data.content : "");
+		setEditDisplayStyle((data.display_style as "standard" | "reading") || "standard");
 		setEditOriginalFileUrl(data.file_url ?? null);
 		setEditOriginalFileName(data.file_name ?? null);
 	};
@@ -472,6 +477,7 @@ export default function AdminPage() {
 			subtitle: editSubtitle.trim() || null,
 			category: editCategory,
 			content: editContent.trim(),
+			display_style: editDisplayStyle,
 		};
 
 		try {
@@ -1235,7 +1241,30 @@ export default function AdminPage() {
 									<option value="문학">문학</option>
 									<option value="비문학">비문학</option>
 								</select>
-								<textarea value={content} onChange={(e) => setContent(e.target.value)} rows={10} placeholder="파싱형 원문/해설 텍스트를 전체 입력하세요." className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+								<div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+								<p className="mb-2 text-xs font-semibold text-zinc-600">표시 스타일</p>
+								<div className="flex gap-4">
+									<label className="flex cursor-pointer items-center gap-1.5 text-sm text-zinc-700">
+										<input type="radio" name="displayStyle" value="standard" checked={displayStyle === "standard"} onChange={() => setDisplayStyle("standard")} className="accent-brand" />
+										기본 스타일
+									</label>
+									<label className="flex cursor-pointer items-center gap-1.5 text-sm text-zinc-700">
+										<input type="radio" name="displayStyle" value="reading" checked={displayStyle === "reading"} onChange={() => setDisplayStyle("reading")} className="accent-brand" />
+										읽기 연습
+									</label>
+								</div>
+								{displayStyle === "reading" ? (
+									<p className="mt-1.5 text-[11px] text-zinc-500">[원문]문장[해설]해설문장 형식으로 번갈아 입력하세요.</p>
+								) : null}
+							</div>
+
+							<textarea
+								value={content}
+								onChange={(e) => setContent(e.target.value)}
+								rows={10}
+								placeholder={displayStyle === "reading" ? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이 아니지..." : "파싱형 원문/해설 텍스트를 전체 입력하세요."}
+								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+							/>
 
 								<div className="rounded-xl border border-zinc-300 bg-zinc-50 px-3 py-2.5">
 									<label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-zinc-700">
@@ -1325,11 +1354,29 @@ export default function AdminPage() {
 										<form className="mt-4 space-y-3" onSubmit={handleSaveMaterialEdit}>
 											<input type="text" value={editTitle} onChange={(e) => setEditTitle(e.target.value)} placeholder="자료 제목" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 											<input type="text" value={editSubtitle} onChange={(e) => setEditSubtitle(e.target.value)} placeholder="자료 부제 (리스트 카드 상단 미리보기 문구)" className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
-											<select value={editCategory} onChange={(e) => setEditCategory(e.target.value as Category)} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500">
-												<option value="문학">문학</option>
-												<option value="비문학">비문학</option>
-											</select>
-											<textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} placeholder="파싱형 원문/해설 텍스트를 전체 입력하세요." className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+										<select value={editCategory} onChange={(e) => setEditCategory(e.target.value as Category)} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500">
+											<option value="문학">문학</option>
+											<option value="비문학">비문학</option>
+										</select>
+
+										<div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2.5">
+											<p className="mb-2 text-xs font-semibold text-zinc-600">표시 스타일</p>
+											<div className="flex gap-4">
+												<label className="flex cursor-pointer items-center gap-1.5 text-sm text-zinc-700">
+													<input type="radio" name="editDisplayStyle" value="standard" checked={editDisplayStyle === "standard"} onChange={() => setEditDisplayStyle("standard")} className="accent-brand" />
+													기본 스타일
+												</label>
+												<label className="flex cursor-pointer items-center gap-1.5 text-sm text-zinc-700">
+													<input type="radio" name="editDisplayStyle" value="reading" checked={editDisplayStyle === "reading"} onChange={() => setEditDisplayStyle("reading")} className="accent-brand" />
+													읽기 연습
+												</label>
+											</div>
+											{editDisplayStyle === "reading" ? (
+												<p className="mt-1.5 text-[11px] text-zinc-500">[원문]문장[해설]해설문장 형식으로 번갈아 입력하세요.</p>
+											) : null}
+										</div>
+
+										<textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} placeholder={editDisplayStyle === "reading" ? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이..." : "파싱형 원문/해설 텍스트를 전체 입력하세요."} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
 
 											<p className="text-xs text-zinc-500">
 												현재 PDF: {editOriginalFileName || "없음"}
