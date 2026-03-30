@@ -1254,7 +1254,10 @@ export default function AdminPage() {
 									</label>
 								</div>
 								{displayStyle === "reading" ? (
-									<p className="mt-1.5 text-[11px] text-zinc-500">[원문]문장[해설]해설문장 형식으로 번갈아 입력하세요.</p>
+									<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+										[원문]·[해설]을 번갈아 입력한 뒤, 기본 자료와 동일하게{" "}
+										<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 블록으로 요약·어휘·스스로 생각하기를 붙일 수 있습니다.
+									</p>
 								) : null}
 							</div>
 
@@ -1262,7 +1265,11 @@ export default function AdminPage() {
 								value={content}
 								onChange={(e) => setContent(e.target.value)}
 								rows={10}
-								placeholder={displayStyle === "reading" ? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이 아니지..." : "파싱형 원문/해설 텍스트를 전체 입력하세요."}
+								placeholder={
+									displayStyle === "reading"
+										? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이...\n\n[학생용 소재 요약본]\n핵심 소재 한줄 요약: ..."
+										: "파싱형 원문/해설 텍스트를 전체 입력하세요."
+								}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
 							/>
 
@@ -1372,11 +1379,24 @@ export default function AdminPage() {
 												</label>
 											</div>
 											{editDisplayStyle === "reading" ? (
-												<p className="mt-1.5 text-[11px] text-zinc-500">[원문]문장[해설]해설문장 형식으로 번갈아 입력하세요.</p>
+												<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+													[원문]·[해설]을 번갈아 입력한 뒤, 기본 자료와 동일하게{" "}
+													<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 블록으로 요약·어휘·스스로 생각하기를 붙일 수 있습니다.
+												</p>
 											) : null}
 										</div>
 
-										<textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={10} placeholder={editDisplayStyle === "reading" ? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이..." : "파싱형 원문/해설 텍스트를 전체 입력하세요."} className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500" />
+										<textarea
+											value={editContent}
+											onChange={(e) => setEditContent(e.target.value)}
+											rows={10}
+											placeholder={
+												editDisplayStyle === "reading"
+													? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이...\n\n[학생용 소재 요약본]\n핵심 소재 한줄 요약: ..."
+													: "파싱형 원문/해설 텍스트를 전체 입력하세요."
+											}
+											className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+										/>
 
 											<p className="text-xs text-zinc-500">
 												현재 PDF: {editOriginalFileName || "없음"}
