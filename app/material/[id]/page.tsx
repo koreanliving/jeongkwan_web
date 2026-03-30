@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, type ComponentPropsWithoutRef, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, type ComponentPropsWithoutRef, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -9,11 +9,8 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { supabase } from "../../../utils/supabase";
-import {
-	parseStructuredMaterialContent,
-	type ParsedPair,
-	type ParsedSummary,
-} from "../../../utils/materialParser";
+import type { MaterialBlock } from "../../../utils/materialBlocks";
+import { parseMaterialContent, type ParsedSummary } from "../../../utils/materialParser";
 
 type MaterialDetail = {
 	id: number;
@@ -53,6 +50,15 @@ function resolveFileUrl(fileUrl: string | null) {
 	if (!fileUrl) return null;
 	if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) return fileUrl;
 	const { data } = supabase.storage.from("materials").getPublicUrl(fileUrl);
+	return data.publicUrl;
+}
+
+/** JSON 블록의 image.url — PDF와 동일하게 materials 버킷 상대경로 또는 절대 URL 허용 */
+function resolveMaterialAssetUrl(url: string) {
+	const u = url.trim();
+	if (!u) return "";
+	if (u.startsWith("http://") || u.startsWith("https://")) return u;
+	const { data } = supabase.storage.from("materials").getPublicUrl(u);
 	return data.publicUrl;
 }
 
@@ -128,82 +134,174 @@ function MaterialSummarySection({ summary }: { summary: ParsedSummary }) {
 	);
 }
 
-// ─── 읽기 연습 뷰 ────────────────────────────────────────────────────────────────
-function ReadingPracticeView({ pairs, summary }: { pairs: ParsedPair[]; summary: ParsedSummary | null }) {
+/**
+ * type: "image" 블록 전용 — 툴팁 없이 이미지만 표시합니다.
+ * (나중에 formula 블록을 추가하면 이와 같은 옆에 MaterialBlockFormula 컴포넌트를 두면 됩니다.)
+ */
+function MaterialBlockImage({ url, alt }: { url: string; alt?: string }) {
+	const src = resolveMaterialAssetUrl(url);
+	if (!src) {
+		return (
+			<p className="rounded-xl border border-dashed border-zinc-300 bg-zinc-50 px-3 py-2 text-sm text-zinc-500">이미지 주소가 비어 있습니다.</p>
+		);
+	}
+	return (
+		<figure className="my-1 overflow-hidden rounded-2xl border border-zinc-200/90 bg-zinc-50 shadow-sm">
+			{/* eslint-disable-next-line @next/next/no-img-element -- 원격·스토리지 URL 혼합, 업로드 경로 가변 */}
+			<img src={src} alt={alt ?? ""} className="mx-auto max-h-[min(70vh,32rem)] w-full max-w-full object-contain" loading="lazy" />
+		</figure>
+	);
+}
+
+/**
+ * 기본 스타일 자료 본문: blocks 배열을 순서대로 돌면서 type에 따라 분기합니다.
+ * - text: 원문 카드 + commentary(해설) 영역
+ * - image: 가로 전체를 쓰는 그림 (그리드에서 sm:col-span-2)
+ */
+function StandardMaterialBlocksView({ blocks }: { blocks: MaterialBlock[] }) {
+	if (blocks.length === 0) return null;
+
+	return (
+		<div className="grid gap-4 sm:grid-cols-2">
+			{blocks.map((block, index) => {
+				switch (block.type) {
+					case "text":
+						return (
+							<div key={`std-block-${index}`} className="rounded-xl border border-zinc-200/90 bg-zinc-50 p-3 shadow-sm">
+								<p className="rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm font-extrabold tracking-tight text-zinc-800 whitespace-pre-wrap">
+									{block.content}
+								</p>
+								{block.commentary?.trim() ? (
+									<p className="vocab-meaning-text mt-2 whitespace-pre-wrap text-[13px] sm:text-sm">{block.commentary}</p>
+								) : null}
+							</div>
+						);
+					case "image":
+						return (
+							<div key={`std-block-${index}`} className="sm:col-span-2">
+								<MaterialBlockImage url={block.url} alt={block.alt} />
+							</div>
+						);
+					default:
+						/* formula / table 등 유니온 확장 시 여기에 case 추가 */
+						return null;
+				}
+			})}
+		</div>
+	);
+}
+
+/**
+ * 읽기 연습: blocks를 순서대로 렌더하되,
+ * - text → 번호가 매겨진 문장 카드 + (해설이 있으면) 기존과 동일한 하단 고정 툴팁 패널
+ * - image → 그림만 표시, 툴팁/포커스 상태와 무관
+ *
+ * hoverIndex / pinnedIndex는 "몇 번째 text 블록인가"만 가리킵니다 (이미지는 건너뜀).
+ */
+function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; summary: ParsedSummary | null }) {
 	const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 	const [pinnedIndex, setPinnedIndex] = useState<number | null>(null);
 
 	const activeIndex = hoverIndex ?? pinnedIndex;
 
-	const handleClick = useCallback(
-		(i: number) => {
-			setPinnedIndex((prev) => (prev === i ? null : i));
-		},
-		[],
+	const handleClick = useCallback((textSlot: number) => {
+		setPinnedIndex((prev) => (prev === textSlot ? null : textSlot));
+	}, []);
+
+	/** text 블록만 모은 목록 — 툴팁 활성 문장은 이 배열의 인덱스로 찾습니다. */
+	const textBlocks = useMemo(
+		() => blocks.filter((b): b is Extract<MaterialBlock, { type: "text" }> => b.type === "text"),
+		[blocks],
 	);
 
-	if (pairs.length === 0 && !summary) {
+	/**
+	 * 각 블록 인덱스 → 해당 위치가 text면 0부터 시작하는 "문장 번호", image면 -1
+	 * (map 안에서 조건문 대신 미리 계산해 두면 읽기 쉽습니다.)
+	 */
+	const textSlotAtBlockIndex = useMemo(() => {
+		const slots: number[] = [];
+		let t = 0;
+		for (let i = 0; i < blocks.length; i++) {
+			if (blocks[i].type === "text") {
+				slots[i] = t;
+				t += 1;
+			} else {
+				slots[i] = -1;
+			}
+		}
+		return slots;
+	}, [blocks]);
+
+	const activeTextBlock = activeIndex !== null && textBlocks.length > 0 ? textBlocks[activeIndex] : null;
+	const activeExplanation = activeTextBlock?.commentary?.trim() ?? "";
+
+	if (textBlocks.length === 0 && !summary) {
 		return (
 			<p className="mt-6 rounded-xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-sm text-zinc-500">
-				읽기 연습 콘텐츠를 불러올 수 없습니다. [원문]/[해설] 또는 기본 자료와 동일한 [학생용 소재 요약본] 형식으로 입력했는지 확인해 주세요.
+				읽기 연습 콘텐츠를 불러올 수 없습니다. JSON 블록의 <code className="rounded bg-zinc-200/80 px-1">text</code> 항목, 또는 [원문]/[해설]·[학생용 소재 요약본] 형식을 확인해 주세요.
 			</p>
 		);
 	}
 
-	const activePair = activeIndex !== null && pairs.length > 0 ? pairs[activeIndex] : null;
-	const activeExplanation = activePair?.explanation?.trim() ?? "";
-
 	return (
 		<section className="mt-6">
-			{/* 안내 배지 */}
 			<div className="mb-4 flex flex-wrap items-center gap-2">
 				<span className="rounded-full bg-brand/10 px-2.5 py-1 text-[10px] font-bold tracking-widest text-brand">
 					읽기 연습
 				</span>
 				<p className="text-xs text-zinc-500">
-					{pairs.length > 0
-						? `${pairs.length}개 문장 · 문장을 탭하거나 마우스를 올리면 아래에 해설이 나타납니다`
+					{textBlocks.length > 0
+						? `${textBlocks.length}개 문장 · 문장을 탭하거나 마우스를 올리면 아래에 해설이 나타납니다`
 						: "요약·어휘 블록만 표시됩니다."}
 				</p>
 			</div>
 
-			{/* 문장 카드 목록 */}
-			{pairs.length > 0 ? (
-				<div className="space-y-4">
-					{pairs.map((pair, i) => {
-						const isActive = activeIndex === i;
-						const isPinned = pinnedIndex === i;
-						return (
-							<div
-								key={i}
-								role="button"
-								tabIndex={0}
-								aria-expanded={isActive}
-								className={[
-									"cursor-pointer select-none rounded-2xl border-2 px-4 py-4 text-base font-medium leading-relaxed tracking-tight transition-all duration-150 sm:px-5 sm:text-lg",
-									isActive
-										? "border-brand bg-brand/5 text-brand shadow-md shadow-brand/10"
-										: "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:shadow-sm",
-									isPinned ? "ring-2 ring-brand/30 ring-offset-1" : "",
-								].join(" ")}
-								onMouseEnter={() => setHoverIndex(i)}
-								onMouseLeave={() => setHoverIndex(null)}
-								onClick={() => handleClick(i)}
-								onKeyDown={(e) => {
-									if (e.key === "Enter" || e.key === " ") handleClick(i);
-								}}
-							>
-								<span className="mr-2.5 inline-block rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 tabular-nums">
-									{i + 1}
-								</span>
-								{pair.original}
-							</div>
-						);
-					})}
-				</div>
-			) : null}
+			<div className="space-y-4">
+				{blocks.map((block, i) => {
+					switch (block.type) {
+						case "image":
+							return <MaterialBlockImage key={`read-block-${i}`} url={block.url} alt={block.alt} />;
+						case "text": {
+							const textSlot = textSlotAtBlockIndex[i];
+							const isActive = activeIndex === textSlot;
+							const isPinned = pinnedIndex === textSlot;
+							return (
+								<div
+									key={`read-block-${i}`}
+									role="button"
+									tabIndex={0}
+									aria-expanded={isActive}
+									className={[
+										"cursor-pointer select-none rounded-2xl border-2 px-4 py-4 text-base font-medium leading-relaxed tracking-tight transition-all duration-150 sm:px-5 sm:text-lg whitespace-pre-wrap",
+										isActive
+											? "border-brand bg-brand/5 text-brand shadow-md shadow-brand/10"
+											: "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:shadow-sm",
+										isPinned ? "ring-2 ring-brand/30 ring-offset-1" : "",
+									].join(" ")}
+									onMouseEnter={() => setHoverIndex(textSlot)}
+									onMouseLeave={() => setHoverIndex(null)}
+									onClick={() => handleClick(textSlot)}
+									onKeyDown={(e) => {
+										if (e.key === "Enter" || e.key === " ") {
+											e.preventDefault();
+											handleClick(textSlot);
+										}
+									}}
+								>
+									<span className="mr-2.5 inline-block rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 tabular-nums">
+										{textSlot + 1}
+									</span>
+									{block.content}
+								</div>
+							);
+						}
+						default:
+							return null;
+					}
+				})}
+			</div>
 
-			{/* 하단 고정 해설 패널 */}
+			{/* 기존과 동일한 하단 고정 해설 패널 (툴팁) */}
 			<div
 				className={[
 					"fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(32rem,94vw)] -translate-x-1/2 transition-all duration-300",
@@ -215,27 +313,21 @@ function ReadingPracticeView({ pairs, summary }: { pairs: ParsedPair[]; summary:
 				aria-live="polite"
 			>
 				<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
-					{/* 헤더 */}
 					<div className="mb-2.5 flex items-center gap-2">
 						<span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
 							해설
 						</span>
 						{activeIndex !== null ? (
-							<span className="text-[10px] font-bold text-zinc-500">
-								문장 {activeIndex + 1}
-							</span>
+							<span className="text-[10px] font-bold text-zinc-500">문장 {activeIndex + 1}</span>
 						) : null}
 					</div>
-					{/* 해설 본문 */}
 					<p className="whitespace-pre-wrap text-sm font-medium leading-7 tracking-tight text-white sm:text-base sm:leading-8">
 						{activeExplanation}
 					</p>
 				</div>
-				{/* 패널 꼭지 */}
-				<div className="mx-auto h-1 w-10 rounded-full bg-zinc-600/50 mt-1.5" aria-hidden />
+				<div className="mx-auto mt-1.5 h-1 w-10 rounded-full bg-zinc-600/50" aria-hidden />
 			</div>
 
-			{/* 해설 패널이 열렸을 때 아래쪽 여백 보정 */}
 			{activeExplanation ? <div className="h-40" aria-hidden /> : null}
 
 			{summary ? <MaterialSummarySection summary={summary} /> : null}
@@ -253,8 +345,8 @@ export default function MaterialDetailPage() {
 	const [showPostDates, setShowPostDates] = useState(true);
 
 	const resolvedFileUrl = resolveFileUrl(material?.file_url ?? null);
-	const parsed = useMemo(() => parseStructuredMaterialContent(material?.content ?? ""), [material?.content]);
-	const isParsedView = parsed.pairs.length > 0 || !!parsed.summary;
+	const parsed = useMemo(() => parseMaterialContent(material?.content ?? ""), [material?.content]);
+	const isParsedView = parsed.blocks.length > 0 || !!parsed.summary;
 
 	useEffect(() => {
 		let isMounted = true;
@@ -362,22 +454,10 @@ export default function MaterialDetailPage() {
 						</header>
 
 						{material.display_style === "reading" ? (
-							<ReadingPracticeView pairs={parsed.pairs} summary={parsed.summary} />
+							<ReadingPracticeView blocks={parsed.blocks} summary={parsed.summary} />
 						) : isParsedView ? (
 							<section className="mt-6">
-								<div className="grid gap-4 sm:grid-cols-2">
-									{parsed.pairs.map((pair, index) => (
-										<div key={`pair-${index + 1}`} className="rounded-xl border border-zinc-200/90 bg-zinc-50 p-3 shadow-sm">
-											<p className="rounded-lg border border-zinc-200/90 bg-white px-3 py-2 text-sm font-extrabold tracking-tight text-zinc-800">
-												{pair.original}
-											</p>
-											{pair.explanation ? (
-												<p className="vocab-meaning-text mt-2 whitespace-pre-wrap text-[13px] sm:text-sm">{pair.explanation}</p>
-											) : null}
-										</div>
-									))}
-								</div>
-
+								<StandardMaterialBlocksView blocks={parsed.blocks} />
 								{parsed.summary ? <MaterialSummarySection summary={parsed.summary} /> : null}
 							</section>
 						) : material.content.trim() ? (

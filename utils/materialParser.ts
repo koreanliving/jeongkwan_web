@@ -1,3 +1,8 @@
+import { tryParseMaterialBlocksJson, type MaterialBlock, type MaterialTextBlock } from "./materialBlocks";
+
+/** 외부에서 블록 타입만 쓸 때: `import type { MaterialBlock } from "@/utils/materialParser"` 도 가능 */
+export type { MaterialBlock, MaterialContentDocument, MaterialImageBlock, MaterialTextBlock } from "./materialBlocks";
+
 export type ParsedPair = {
 	original: string;
 	explanation: string;
@@ -16,6 +21,17 @@ export type ParsedSummary = {
 export type ParsedMaterialContent = {
 	pairs: ParsedPair[];
 	summary: ParsedSummary | null;
+};
+
+/**
+ * 통합 파싱 결과.
+ * - blocks: 화면 렌더 순서 (텍스트·이미지 혼합)
+ * - format: json 이면 DB에 JSON으로 저장된 자료, legacy 면 [원문]/[해설] 문자열 자료
+ */
+export type UnifiedMaterialParse = {
+	blocks: MaterialBlock[];
+	summary: ParsedSummary | null;
+	format: "json" | "legacy";
 };
 
 type SummarySection = "oneLine" | "analogy" | "contrast" | "essential" | "support" | "thinking";
@@ -143,7 +159,11 @@ function parseSummaryBlock(summaryRaw: string): ParsedSummary | null {
 	};
 }
 
-export function parseStructuredMaterialContent(raw: string): ParsedMaterialContent {
+/**
+ * 레거시: 본문 전체가 "[원문]…[해설]…" + 선택적 "[학생용 소재 요약본]…" 인 경우.
+ * (JSON이 아닐 때만 사용합니다.)
+ */
+function parseLegacyStructuredMaterialContent(raw: string): ParsedMaterialContent {
 	const content = (raw || "").trim();
 	if (!content) {
 		return { pairs: [], summary: null };
@@ -171,4 +191,58 @@ export function parseStructuredMaterialContent(raw: string): ParsedMaterialConte
 	const summary = summarySource ? parseSummaryBlock(summarySource) : null;
 
 	return { pairs, summary };
+}
+
+/** text 블록만 뽑아 레거시 ParsedPair 배열로 변환 (어드민 미리보기·호환용) */
+export function blocksToParsedPairs(blocks: MaterialBlock[]): ParsedPair[] {
+	return blocks
+		.filter((b): b is MaterialTextBlock => b.type === "text")
+		.map((b) => ({
+			original: b.content,
+			explanation: (b.commentary ?? "").trim(),
+		}))
+		.filter((item) => item.original.length > 0);
+}
+
+/**
+ * 자료 본문 통합 파서.
+ * 1) JSON `{ blocks, summary? }` 또는 `[ 블록들 ]` 이면 블록 기반으로 처리
+ * 2) 그 외는 기존 [원문]/[해설] 텍스트 파서
+ */
+export function parseMaterialContent(raw: string): UnifiedMaterialParse {
+	const content = (raw || "").trim();
+	if (!content) {
+		return { blocks: [], summary: null, format: "legacy" };
+	}
+
+	const fromJson = tryParseMaterialBlocksJson(content);
+	if (fromJson !== null) {
+		let summary: ParsedSummary | null = null;
+		if (fromJson.summary?.trim()) {
+			summary = parseSummaryBlock(fromJson.summary);
+		}
+		return { blocks: fromJson.blocks, summary, format: "json" };
+	}
+
+	const legacy = parseLegacyStructuredMaterialContent(content);
+	const blocks: MaterialBlock[] = legacy.pairs.map((p) => ({
+		type: "text" as const,
+		content: p.original,
+		commentary: p.explanation ? p.explanation : undefined,
+	}));
+
+	return {
+		blocks,
+		summary: legacy.summary,
+		format: "legacy",
+	};
+}
+
+/** 내부적으로 parseMaterialContent 사용. 기존 코드·어드민 미리보기 호환용. */
+export function parseStructuredMaterialContent(raw: string): ParsedMaterialContent {
+	const u = parseMaterialContent(raw);
+	return {
+		pairs: blocksToParsedPairs(u.blocks),
+		summary: u.summary,
+	};
 }

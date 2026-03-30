@@ -10,7 +10,7 @@ import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/
 import { supabase } from "../../utils/supabase";
 
 const ADMIN_DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
-import { parseStructuredMaterialContent } from "../../utils/materialParser";
+import { parseMaterialContent } from "../../utils/materialParser";
 
 type Category = "문학" | "비문학";
 type AdminTab = "materials" | "videos" | "main" | "members" | "requests";
@@ -252,7 +252,9 @@ export default function AdminPage() {
 	const [detailSavingExamId, setDetailSavingExamId] = useState<number | null>(null);
 	const [detailDeletingExamId, setDetailDeletingExamId] = useState<number | null>(null);
 
-	const parsedPreview = useMemo(() => parseStructuredMaterialContent(content), [content]);
+	const parsedPreview = useMemo(() => parseMaterialContent(content), [content]);
+	const previewTextBlocks = parsedPreview.blocks.filter((b) => b.type === "text").length;
+	const previewImageBlocks = parsedPreview.blocks.filter((b) => b.type === "image").length;
 
 	const fetchManagementData = useCallback(async () => {
 		const [studentsResponse, requestsResponse, signupResponse] = await Promise.all([
@@ -1297,7 +1299,10 @@ export default function AdminPage() {
 							{showPreview ? (
 								<div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
 									<h3 className="text-sm font-semibold text-zinc-900">파싱 미리보기</h3>
-									<p className="mt-1 text-xs text-zinc-500">원문/해설 {parsedPreview.pairs.length}세트, 요약블록 {parsedPreview.summary ? "인식" : "미인식"}</p>
+									<p className="mt-1 text-xs text-zinc-500">
+										형식: {parsedPreview.format === "json" ? "JSON 블록" : "텍스트([원문]/[해설])"} · 텍스트 블록 {previewTextBlocks}개 · 이미지 블록 {previewImageBlocks}개 · 요약{" "}
+										{parsedPreview.summary ? "인식" : "미인식"}
+									</p>
 									{parsedPreview.summary ? (
 										<div className="mt-3 space-y-2 text-sm">
 											<p><b>핵심 소재 한줄 요약:</b> {parsedPreview.summary.oneLine || "-"}</p>
