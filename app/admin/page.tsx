@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { ClipboardList, ImagePlus, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
@@ -10,6 +10,7 @@ import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/
 import { supabase } from "../../utils/supabase";
 
 const ADMIN_DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
+import { insertMaterialImageIntoJson } from "../../utils/materialContentInsertImage";
 import { parseMaterialContent } from "../../utils/materialParser";
 
 type Category = "문학" | "비문학";
@@ -103,6 +104,29 @@ function safeFileName(name: string) {
 	return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+/** 이미지·혼합 블록 편집용 JSON 시작 템플릿 (text 블록 + 요약 필드) */
+function defaultMaterialJsonTemplate(): string {
+	return JSON.stringify(
+		{
+			blocks: [
+				{
+					type: "text",
+					content: "첫 번째 원문·지문을 입력하세요.",
+					commentary: "읽기 연습 툴팁·기본 스타일 카드 아래 해설",
+				},
+				{
+					type: "text",
+					content: "이미지 삽입 후 이어질 문단",
+					commentary: "",
+				},
+			],
+			summary: "[학생용 소재 요약본]\n핵심 소재 한줄 요약: ",
+		},
+		null,
+		2,
+	);
+}
+
 function getYoutubeEmbedUrl(videoUrl: string) {
 	try {
 		const parsed = new URL(videoUrl);
@@ -171,6 +195,12 @@ export default function AdminPage() {
 	const [editError, setEditError] = useState("");
 	const [isLoadingEditMaterial, setIsLoadingEditMaterial] = useState(false);
 	const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+	const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
+	const editContentTextareaRef = useRef<HTMLTextAreaElement>(null);
+	const embedFileCreateRef = useRef<HTMLInputElement>(null);
+	const embedFileEditRef = useRef<HTMLInputElement>(null);
+	const [materialEmbedUploading, setMaterialEmbedUploading] = useState<"create" | "edit" | null>(null);
 
 	const [videoTitle, setVideoTitle] = useState("");
 	const [videoCategory, setVideoCategory] = useState<Category>("문학");
@@ -352,6 +382,87 @@ export default function AdminPage() {
 		if (error) throw error;
 		return path;
 	};
+
+	/** 본문 JSON에 끼워 넣을 이미지 — 신규 등록 시에는 draft 폴더, 수정 시에는 자료 ID 폴더 */
+	const uploadMaterialEmbedImage = useCallback(async (file: File, materialId: number | null) => {
+		const okType =
+			file.type.startsWith("image/") ||
+			/\.(png|jpe?g|webp|gif)$/i.test(file.name);
+		if (!okType) {
+			throw new Error("이미지 파일(png, jpg, webp, gif)만 올릴 수 있습니다.");
+		}
+		const cleanedName = safeFileName(file.name);
+		const folder = materialId != null ? String(materialId) : `draft-${Date.now()}`;
+		const path = `${folder}/embed/${Date.now()}-${cleanedName}`;
+		const { error } = await supabase.storage.from("materials").upload(path, file, {
+			cacheControl: "3600",
+			upsert: false,
+			contentType: file.type || "application/octet-stream",
+		});
+		if (error) throw error;
+		return path;
+	}, []);
+
+	const applyMaterialJsonTemplate = useCallback(
+		(which: "create" | "edit") => {
+			const current = which === "create" ? content : editContent;
+			if (current.trim() && !window.confirm("현재 본문을 JSON 템플릿으로 바꿉니다. 계속할까요?")) {
+				return;
+			}
+			const tpl = defaultMaterialJsonTemplate();
+			if (which === "create") {
+				setContent(tpl);
+				setCreateError("");
+			} else {
+				setEditContent(tpl);
+				setEditError("");
+			}
+		},
+		[content, editContent],
+	);
+
+	const handleMaterialEmbedImageSelected = useCallback(
+		async (which: "create" | "edit", file: File | null | undefined) => {
+			if (!file) return;
+			setMaterialEmbedUploading(which);
+			try {
+				const path = await uploadMaterialEmbedImage(file, which === "edit" ? editingMaterialId : null);
+				const ta = which === "create" ? contentTextareaRef.current : editContentTextareaRef.current;
+				const text = which === "create" ? content : editContent;
+				const cursor = ta?.selectionStart ?? text.length;
+				const alt = file.name.replace(/\.[^.]+$/, "") || "이미지";
+				const next = insertMaterialImageIntoJson(text, cursor, path, alt);
+				if (next === null) {
+					const msg =
+						"이미지 삽입은 JSON 본문일 때만 가능합니다. 「JSON 본문 템플릿」으로 시작하거나, { \"blocks\": [ ... ] } 또는 배열 [ ... ] 형식을 맞춰 주세요.";
+					if (which === "create") setCreateError(msg);
+					else setEditError(msg);
+					return;
+				}
+				if (which === "create") {
+					setContent(next);
+					setCreateError("");
+				} else {
+					setEditContent(next);
+					setEditError("");
+				}
+				const marker = `"url": ${JSON.stringify(path)}`;
+				requestAnimationFrame(() => {
+					ta?.focus();
+					const idx = next.indexOf(marker);
+					const pos = idx >= 0 ? Math.min(idx + marker.length + 24, next.length) : next.length;
+					ta?.setSelectionRange(pos, pos);
+				});
+			} catch (e) {
+				const msg = e instanceof Error ? e.message : "이미지 업로드에 실패했습니다.";
+				if (which === "create") setCreateError(msg);
+				else setEditError(msg);
+			} finally {
+				setMaterialEmbedUploading(null);
+			}
+		},
+		[content, editContent, editingMaterialId, uploadMaterialEmbedImage],
+	);
 
 	const handleCreateMaterial = async (event: FormEvent) => {
 		event.preventDefault();
@@ -1257,13 +1368,52 @@ export default function AdminPage() {
 								</div>
 								{displayStyle === "reading" ? (
 									<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-										[원문]·[해설]을 번갈아 입력한 뒤, 기본 자료와 동일하게{" "}
-										<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 블록으로 요약·어휘·스스로 생각하기를 붙일 수 있습니다.
+										텍스트만 쓸 때는 [원문]·[해설]·<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 형식을 쓰면 됩니다. 중간에 그림을 넣으려면 아래 「JSON 본문 템플릿」을 사용하세요.
 									</p>
-								) : null}
+								) : (
+									<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+										지문 중간에 이미지·그래프를 넣으려면 「JSON 본문 템플릿」 후, <b>blocks</b> 배열 안에 커서를 두고 「이미지 삽입」을 사용하세요.
+									</p>
+								)}
+							</div>
+
+							<div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+								<p className="text-xs font-semibold text-zinc-800">혼합 본문 (JSON)</p>
+								<p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+									템플릿으로 <code className="rounded bg-zinc-100 px-1">blocks</code> 배열을 만든 뒤, 원하는 위치에 커서를 두고 이미지를 넣으면 업로드와 JSON 반영이 한 번에 됩니다. (기본 스타일·읽기 연습 공통)
+								</p>
+								<div className="mt-2 flex flex-wrap items-center gap-2">
+									<button
+										type="button"
+										onClick={() => applyMaterialJsonTemplate("create")}
+										className="inline-flex min-h-9 items-center rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100"
+									>
+										JSON 본문 템플릿
+									</button>
+									<button
+										type="button"
+										disabled={materialEmbedUploading === "create"}
+										onClick={() => embedFileCreateRef.current?.click()}
+										className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/40 bg-brand/10 px-3 text-xs font-semibold text-brand transition hover:bg-brand/15 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										<ImagePlus className="h-3.5 w-3.5" />
+										{materialEmbedUploading === "create" ? "업로드 중…" : "이미지 삽입"}
+									</button>
+								</div>
+								<input
+									ref={embedFileCreateRef}
+									type="file"
+									accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+									className="hidden"
+									onChange={(e) => {
+										void handleMaterialEmbedImageSelected("create", e.target.files?.[0]);
+										e.target.value = "";
+									}}
+								/>
 							</div>
 
 							<textarea
+								ref={contentTextareaRef}
 								value={content}
 								onChange={(e) => setContent(e.target.value)}
 								rows={10}
@@ -1385,13 +1535,52 @@ export default function AdminPage() {
 											</div>
 											{editDisplayStyle === "reading" ? (
 												<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-													[원문]·[해설]을 번갈아 입력한 뒤, 기본 자료와 동일하게{" "}
-													<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 블록으로 요약·어휘·스스로 생각하기를 붙일 수 있습니다.
+													텍스트만 쓸 때는 [원문]·[해설]·<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 형식을 쓰면 됩니다. 중간에 그림을 넣으려면 「JSON 본문 템플릿」을 사용하세요.
 												</p>
-											) : null}
+											) : (
+												<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+													지문 중간에 이미지·그래프를 넣으려면 「JSON 본문 템플릿」 후, <b>blocks</b> 배열 안에 커서를 두고 「이미지 삽입」을 사용하세요.
+												</p>
+											)}
+										</div>
+
+										<div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
+											<p className="text-xs font-semibold text-zinc-800">혼합 본문 (JSON)</p>
+											<p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
+												<code className="rounded bg-zinc-100 px-1">blocks</code> 배열 안 커서 위치에 이미지 블록을 삽입합니다. (기본·읽기 연습 공통)
+											</p>
+											<div className="mt-2 flex flex-wrap items-center gap-2">
+												<button
+													type="button"
+													onClick={() => applyMaterialJsonTemplate("edit")}
+													className="inline-flex min-h-9 items-center rounded-xl border border-zinc-300 bg-zinc-50 px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100"
+												>
+													JSON 본문 템플릿
+												</button>
+												<button
+													type="button"
+													disabled={materialEmbedUploading === "edit"}
+													onClick={() => embedFileEditRef.current?.click()}
+													className="inline-flex min-h-9 items-center gap-1.5 rounded-xl border border-brand/40 bg-brand/10 px-3 text-xs font-semibold text-brand transition hover:bg-brand/15 disabled:cursor-not-allowed disabled:opacity-50"
+												>
+													<ImagePlus className="h-3.5 w-3.5" />
+													{materialEmbedUploading === "edit" ? "업로드 중…" : "이미지 삽입"}
+												</button>
+											</div>
+											<input
+												ref={embedFileEditRef}
+												type="file"
+												accept="image/png,image/jpeg,image/jpg,image/webp,image/gif"
+												className="hidden"
+												onChange={(e) => {
+													void handleMaterialEmbedImageSelected("edit", e.target.files?.[0]);
+													e.target.value = "";
+												}}
+											/>
 										</div>
 
 										<textarea
+											ref={editContentTextareaRef}
 											value={editContent}
 											onChange={(e) => setEditContent(e.target.value)}
 											rows={10}
