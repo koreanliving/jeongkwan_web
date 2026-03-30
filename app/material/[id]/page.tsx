@@ -143,17 +143,6 @@ function ReadingPracticeView({ content }: { content: string }) {
 								{i + 1}
 							</span>
 							{pair.original}
-							{pair.commentary ? (
-								<span
-									className={[
-										"ml-2 inline-block align-middle text-[10px] font-bold transition-colors",
-										isActive ? "text-brand" : "text-zinc-400",
-									].join(" ")}
-									aria-hidden
-								>
-									해설 {isPinned ? "▲" : "▼"}
-								</span>
-							) : null}
 						</div>
 					);
 				})}
