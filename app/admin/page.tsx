@@ -11,6 +11,7 @@ import { supabase } from "../../utils/supabase";
 
 const ADMIN_DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
 import { insertMaterialImageIntoJson } from "../../utils/materialContentInsertImage";
+import { insertMaterialFigureTagAtCursor } from "../../utils/materialTaggedFigure";
 import { parseMaterialContent } from "../../utils/materialParser";
 
 type Category = "문학" | "비문학";
@@ -431,13 +432,9 @@ export default function AdminPage() {
 				const text = which === "create" ? content : editContent;
 				const cursor = ta?.selectionStart ?? text.length;
 				const alt = file.name.replace(/\.[^.]+$/, "") || "이미지";
-				const next = insertMaterialImageIntoJson(text, cursor, path, alt);
+				let next = insertMaterialImageIntoJson(text, cursor, path, alt);
 				if (next === null) {
-					const msg =
-						"이미지 삽입은 JSON 본문일 때만 가능합니다. 「JSON 본문 템플릿」으로 시작하거나, { \"blocks\": [ ... ] } 또는 배열 [ ... ] 형식을 맞춰 주세요.";
-					if (which === "create") setCreateError(msg);
-					else setEditError(msg);
-					return;
+					next = insertMaterialFigureTagAtCursor(text, cursor, path);
 				}
 				if (which === "create") {
 					setContent(next);
@@ -447,10 +444,17 @@ export default function AdminPage() {
 					setEditError("");
 				}
 				const marker = `"url": ${JSON.stringify(path)}`;
+				const tagMarker = `[그림]${path}`;
 				requestAnimationFrame(() => {
 					ta?.focus();
-					const idx = next.indexOf(marker);
-					const pos = idx >= 0 ? Math.min(idx + marker.length + 24, next.length) : next.length;
+					const idxJson = next.indexOf(marker);
+					const idxTag = next.indexOf(tagMarker);
+					const pos =
+						idxJson >= 0
+							? Math.min(idxJson + marker.length + 24, next.length)
+							: idxTag >= 0
+								? Math.min(idxTag + tagMarker.length, next.length)
+								: next.length;
 					ta?.setSelectionRange(pos, pos);
 				});
 			} catch (e) {
@@ -1366,21 +1370,20 @@ export default function AdminPage() {
 										읽기 연습
 									</label>
 								</div>
-								{displayStyle === "reading" ? (
-									<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-										텍스트만 쓸 때는 [원문]·[해설]·<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 형식을 쓰면 됩니다. 중간에 그림을 넣으려면 아래 「JSON 본문 템플릿」을 사용하세요.
-									</p>
-								) : (
-									<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-										지문 중간에 이미지·그래프를 넣으려면 「JSON 본문 템플릿」 후, <b>blocks</b> 배열 안에 커서를 두고 「이미지 삽입」을 사용하세요.
-									</p>
-								)}
+								<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+									<code className="rounded bg-zinc-200/80 px-1">[원문]</code>
+									<code className="rounded bg-zinc-200/80 px-1">[해설]</code>
+									을 반복하다가 그림을 넣을 자리에 커서를 두고 「이미지 삽입」하면{" "}
+									<code className="rounded bg-zinc-200/80 px-1">[그림]업로드경로</code>가 붙습니다. 캡션은{" "}
+									<code className="rounded bg-zinc-200/80 px-1">[그림]경로[해설]설명</code> 순으로 이어 쓸 수 있습니다. 요약은{" "}
+									<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code>을 본문 아래에 붙입니다. (기본·읽기 연습 동일)
+								</p>
 							</div>
 
 							<div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
-								<p className="text-xs font-semibold text-zinc-800">혼합 본문 (JSON)</p>
+								<p className="text-xs font-semibold text-zinc-800">이미지 삽입 · JSON (선택)</p>
 								<p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-									템플릿으로 <code className="rounded bg-zinc-100 px-1">blocks</code> 배열을 만든 뒤, 원하는 위치에 커서를 두고 이미지를 넣으면 업로드와 JSON 반영이 한 번에 됩니다. (기본 스타일·읽기 연습 공통)
+									위 태그 방식이 기본입니다. 필요할 때만 「JSON 본문 템플릿」으로 <code className="rounded bg-zinc-100 px-1">blocks</code> 배열을 쓰고, 같은 「이미지 삽입」으로 JSON에도 넣을 수 있습니다.
 								</p>
 								<div className="mt-2 flex flex-wrap items-center gap-2">
 									<button
@@ -1419,8 +1422,8 @@ export default function AdminPage() {
 								rows={10}
 								placeholder={
 									displayStyle === "reading"
-										? "[원문]17세기 조선의...\n[해설]가만있을 조선 선비들이...\n\n[학생용 소재 요약본]\n핵심 소재 한줄 요약: ..."
-										: "파싱형 원문/해설 텍스트를 전체 입력하세요."
+										? "[원문]...\n[해설]...\n[원문]...\n[해설]...\n(커서) ← 여기서 이미지 삽입 → [그림]경로\n[학생용 소재 요약본]\n핵심 소재 한줄 요약: ..."
+										: "[원문]...[해설]... 중간에 「이미지 삽입」으로 [그림]경로 끼우기. 요약은 [학생용 소재 요약본]..."
 								}
 								className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
 							/>
@@ -1450,8 +1453,14 @@ export default function AdminPage() {
 								<div className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
 									<h3 className="text-sm font-semibold text-zinc-900">파싱 미리보기</h3>
 									<p className="mt-1 text-xs text-zinc-500">
-										형식: {parsedPreview.format === "json" ? "JSON 블록" : "텍스트([원문]/[해설])"} · 텍스트 블록 {previewTextBlocks}개 · 이미지 블록 {previewImageBlocks}개 · 요약{" "}
-										{parsedPreview.summary ? "인식" : "미인식"}
+										형식:{" "}
+										{parsedPreview.format === "json"
+											? "JSON 블록"
+											: parsedPreview.format === "tagged"
+												? "태그([원문]/[해설]/[그림])"
+												: "텍스트([원문]/[해설])"}
+										{" "}
+										· 텍스트 블록 {previewTextBlocks}개 · 이미지 블록 {previewImageBlocks}개 · 요약 {parsedPreview.summary ? "인식" : "미인식"}
 									</p>
 									{parsedPreview.summary ? (
 										<div className="mt-3 space-y-2 text-sm">
@@ -1533,21 +1542,19 @@ export default function AdminPage() {
 													읽기 연습
 												</label>
 											</div>
-											{editDisplayStyle === "reading" ? (
-												<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-													텍스트만 쓸 때는 [원문]·[해설]·<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code> 형식을 쓰면 됩니다. 중간에 그림을 넣으려면 「JSON 본문 템플릿」을 사용하세요.
-												</p>
-											) : (
-												<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
-													지문 중간에 이미지·그래프를 넣으려면 「JSON 본문 템플릿」 후, <b>blocks</b> 배열 안에 커서를 두고 「이미지 삽입」을 사용하세요.
-												</p>
-											)}
+											<p className="mt-1.5 text-[11px] leading-relaxed text-zinc-500">
+												<code className="rounded bg-zinc-200/80 px-1">[원문]</code>
+												<code className="rounded bg-zinc-200/80 px-1">[해설]</code>
+												반복 중 원하는 위치에 커서 → 「이미지 삽입」→{" "}
+												<code className="rounded bg-zinc-200/80 px-1">[그림]경로</code> 생성.{" "}
+												<code className="rounded bg-zinc-200/80 px-1">[학생용 소재 요약본]</code>은 하단에 그대로 사용합니다.
+											</p>
 										</div>
 
 										<div className="rounded-xl border border-zinc-200 bg-white px-3 py-2.5">
-											<p className="text-xs font-semibold text-zinc-800">혼합 본문 (JSON)</p>
+											<p className="text-xs font-semibold text-zinc-800">이미지 삽입 · JSON (선택)</p>
 											<p className="mt-1 text-[11px] leading-relaxed text-zinc-500">
-												<code className="rounded bg-zinc-100 px-1">blocks</code> 배열 안 커서 위치에 이미지 블록을 삽입합니다. (기본·읽기 연습 공통)
+												태그 방식이 기본입니다. JSON이 필요하면 「JSON 본문 템플릿」 후 같은 버튼으로 삽입합니다.
 											</p>
 											<div className="mt-2 flex flex-wrap items-center gap-2">
 												<button

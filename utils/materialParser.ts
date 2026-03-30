@@ -1,4 +1,5 @@
 import { tryParseMaterialBlocksJson, type MaterialBlock, type MaterialTextBlock } from "./materialBlocks";
+import { parseTaggedMixedMaterialBlocks } from "./materialTaggedFigure";
 
 /** 외부에서 블록 타입만 쓸 때: `import type { MaterialBlock } from "@/utils/materialParser"` 도 가능 */
 export type { MaterialBlock, MaterialContentDocument, MaterialImageBlock, MaterialTextBlock } from "./materialBlocks";
@@ -26,12 +27,12 @@ export type ParsedMaterialContent = {
 /**
  * 통합 파싱 결과.
  * - blocks: 화면 렌더 순서 (텍스트·이미지 혼합)
- * - format: json 이면 DB에 JSON으로 저장된 자료, legacy 면 [원문]/[해설] 문자열 자료
+ * - format: json | tagged([그림] 태그) | legacy([원문]/[해설]만)
  */
 export type UnifiedMaterialParse = {
 	blocks: MaterialBlock[];
 	summary: ParsedSummary | null;
-	format: "json" | "legacy";
+	format: "json" | "legacy" | "tagged";
 };
 
 type SummarySection = "oneLine" | "analogy" | "contrast" | "essential" | "support" | "thinking";
@@ -159,27 +160,21 @@ function parseSummaryBlock(summaryRaw: string): ParsedSummary | null {
 	};
 }
 
-/**
- * 레거시: 본문 전체가 "[원문]…[해설]…" + 선택적 "[학생용 소재 요약본]…" 인 경우.
- * (JSON이 아닐 때만 사용합니다.)
- */
-function parseLegacyStructuredMaterialContent(raw: string): ParsedMaterialContent {
-	const content = (raw || "").trim();
-	if (!content) {
-		return { pairs: [], summary: null };
-	}
-
-	const normalized = content.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+function splitMaterialBodyAndSummary(raw: string): { pairSource: string; summarySource: string } {
+	const normalized = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
 	const summaryStart = normalized.search(/\[학생용\s*소재\s*요약본[^\]]*\]/i);
 	const pairSource = summaryStart >= 0 ? normalized.slice(0, summaryStart) : normalized;
 	const summarySource = summaryStart >= 0 ? normalized.slice(summaryStart) : "";
+	return { pairSource, summarySource };
+}
 
+function parseLegacyPairsFromBody(pairSource: string): ParsedPair[] {
 	const pairBlocks = pairSource
 		.split(/\[원문\]/)
 		.map((block) => block.trim())
 		.filter(Boolean);
 
-	const pairs: ParsedPair[] = pairBlocks
+	return pairBlocks
 		.map((block) => {
 			const parts = block.split(/\[해설\]/);
 			const original = (parts[0] || "").trim();
@@ -187,10 +182,6 @@ function parseLegacyStructuredMaterialContent(raw: string): ParsedMaterialConten
 			return { original, explanation };
 		})
 		.filter((item) => item.original.length > 0);
-
-	const summary = summarySource ? parseSummaryBlock(summarySource) : null;
-
-	return { pairs, summary };
 }
 
 /** text 블록만 뽑아 레거시 ParsedPair 배열로 변환 (어드민 미리보기·호환용) */
@@ -207,7 +198,8 @@ export function blocksToParsedPairs(blocks: MaterialBlock[]): ParsedPair[] {
 /**
  * 자료 본문 통합 파서.
  * 1) JSON `{ blocks, summary? }` 또는 `[ 블록들 ]` 이면 블록 기반으로 처리
- * 2) 그 외는 기존 [원문]/[해설] 텍스트 파서
+ * 2) 본문에 [그림] 태그가 있으면 원문/해설/그림 순서 스트림 파서
+ * 3) 그 외는 기존 [원문]/[해설]만 있는 텍스트 파서
  */
 export function parseMaterialContent(raw: string): UnifiedMaterialParse {
 	const content = (raw || "").trim();
@@ -224,8 +216,20 @@ export function parseMaterialContent(raw: string): UnifiedMaterialParse {
 		return { blocks: fromJson.blocks, summary, format: "json" };
 	}
 
-	const legacy = parseLegacyStructuredMaterialContent(content);
-	const blocks: MaterialBlock[] = legacy.pairs.map((p) => ({
+	const { pairSource, summarySource } = splitMaterialBodyAndSummary(content);
+	const summary = summarySource ? parseSummaryBlock(summarySource) : null;
+
+	if (/\[그림\]/.test(pairSource)) {
+		const blocks = parseTaggedMixedMaterialBlocks(pairSource);
+		return {
+			blocks,
+			summary,
+			format: "tagged",
+		};
+	}
+
+	const pairs = parseLegacyPairsFromBody(pairSource);
+	const blocks: MaterialBlock[] = pairs.map((p) => ({
 		type: "text" as const,
 		content: p.original,
 		commentary: p.explanation ? p.explanation : undefined,
@@ -233,7 +237,7 @@ export function parseMaterialContent(raw: string): UnifiedMaterialParse {
 
 	return {
 		blocks,
-		summary: legacy.summary,
+		summary,
 		format: "legacy",
 	};
 }

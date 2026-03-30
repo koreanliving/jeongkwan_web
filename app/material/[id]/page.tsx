@@ -138,6 +138,7 @@ function MaterialSummarySection({ summary }: { summary: ParsedSummary }) {
  * type: "image" 블록 전용 — 툴팁 없이 이미지만 표시합니다.
  * (나중에 formula 블록을 추가하면 이와 같은 옆에 MaterialBlockFormula 컴포넌트를 두면 됩니다.)
  */
+/** 본문 문장 카드 높이에 맞춰 수식·도표가 과하게 커지지 않도록 약 2줄 분량으로 제한 */
 function MaterialBlockImage({ url, alt }: { url: string; alt?: string }) {
 	const src = resolveMaterialAssetUrl(url);
 	if (!src) {
@@ -146,9 +147,14 @@ function MaterialBlockImage({ url, alt }: { url: string; alt?: string }) {
 		);
 	}
 	return (
-		<figure className="my-1 overflow-hidden rounded-2xl border border-zinc-200/90 bg-zinc-50 shadow-sm">
+		<figure className="my-1 flex justify-center overflow-hidden rounded-xl border border-zinc-200/90 bg-zinc-50 py-1 shadow-sm">
 			{/* eslint-disable-next-line @next/next/no-img-element -- 원격·스토리지 URL 혼합, 업로드 경로 가변 */}
-			<img src={src} alt={alt ?? ""} className="mx-auto max-h-[min(70vh,32rem)] w-full max-w-full object-contain" loading="lazy" />
+			<img
+				src={src}
+				alt={alt ?? ""}
+				className="h-auto max-h-[5.5rem] w-auto max-w-[min(100%,18rem)] object-contain sm:max-h-[6rem]"
+				loading="lazy"
+			/>
 		</figure>
 	);
 }
