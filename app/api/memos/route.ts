@@ -3,13 +3,7 @@ import { addMemo, deleteMemo, getMemosForStudent } from "@/utils/examRecordsMemo
 import { isAdminRequest } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
-
-function parseStudentIdParam(searchParams: URLSearchParams): string | null {
-	const raw = searchParams.get("studentId");
-	if (raw === null || raw === "") return null;
-	const id = raw.trim();
-	return isValidUuid(id) ? id : null;
-}
+import { parseStudentIdParam } from "@/utils/server/parseStudentId";
 
 export async function GET(request: NextRequest) {
 	if (!isAdminRequest(request)) {

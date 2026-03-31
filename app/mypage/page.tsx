@@ -11,6 +11,7 @@ import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import { supabase } from "@/utils/supabase";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import type { ExamRecord } from "@/utils/examRecordsMemos";
+import { toKoreanDate } from "@/utils/dateFormat";
 
 const DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
 
@@ -18,14 +19,6 @@ type HomeSetting = {
 	id: number;
 	show_post_dates: boolean;
 };
-
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
 
 export default function MyPage() {
 	const [auth, setAuth] = useState<"unknown" | "guest" | "user">("unknown");

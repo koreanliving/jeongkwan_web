@@ -11,6 +11,7 @@ import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { supabase } from "../../../utils/supabase";
 import type { MaterialBlock } from "../../../utils/materialBlocks";
 import { parseMaterialContent, type ParsedSummary } from "../../../utils/materialParser";
+import { toKoreanDate } from "@/utils/dateFormat";
 
 type MaterialDetail = {
 	id: number;
@@ -60,14 +61,6 @@ function resolveMaterialAssetUrl(url: string) {
 	if (u.startsWith("http://") || u.startsWith("https://")) return u;
 	const { data } = supabase.storage.from("materials").getPublicUrl(u);
 	return data.publicUrl;
-}
-
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
 }
 
 function MaterialSummarySection({ summary }: { summary: ParsedSummary }) {

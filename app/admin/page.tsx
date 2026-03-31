@@ -14,6 +14,8 @@ const ADMIN_DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
 import { insertMaterialImageIntoJson } from "../../utils/materialContentInsertImage";
 import { insertMaterialFigureTagAtCursor } from "../../utils/materialTaggedFigure";
 import { parseMaterialContent } from "../../utils/materialParser";
+import { getYoutubeEmbedUrl } from "@/lib/youtube";
+import { toKoreanDate } from "@/utils/dateFormat";
 
 type Category = "문학" | "비문학";
 type AdminTab = "materials" | "videos" | "main" | "members" | "requests";
@@ -94,14 +96,6 @@ type SignupRequestItem = {
 	updated_at: string;
 };
 
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
-
 function safeFileName(name: string) {
 	return name.replace(/[^a-zA-Z0-9._-]/g, "_");
 }
@@ -129,24 +123,6 @@ function defaultMaterialJsonTemplate(): string {
 	);
 }
 
-function getYoutubeEmbedUrl(videoUrl: string) {
-	try {
-		const parsed = new URL(videoUrl);
-		if (parsed.hostname.includes("youtu.be")) {
-			const id = parsed.pathname.replace("/", "");
-			return id ? `https://www.youtube.com/embed/${id}` : null;
-		}
-		if (parsed.hostname.includes("youtube.com")) {
-			if (parsed.pathname.startsWith("/embed/")) return videoUrl;
-			const id = parsed.searchParams.get("v");
-			return id ? `https://www.youtube.com/embed/${id}` : null;
-		}
-		return null;
-	} catch {
-		return null;
-	}
-}
-
 function toStoragePath(fileUrl: string | null) {
 	if (!fileUrl) return null;
 	if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
@@ -170,7 +146,6 @@ export default function AdminPage() {
 	const [videos, setVideos] = useState<VideoItem[]>([]);
 	const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
 
-	const [isLoadingList, setIsLoadingList] = useState(true);
 	const [listError, setListError] = useState("");
 
 	const [title, setTitle] = useState("");
@@ -333,7 +308,6 @@ export default function AdminPage() {
 	}, []);
 
 	const fetchAdminData = useCallback(async () => {
-		setIsLoadingList(true);
 		setListError("");
 
 		const [materialResult, videoResult, announcementResult, settingResult] = await Promise.all([
@@ -356,7 +330,6 @@ export default function AdminPage() {
 			setMaterials([]);
 			setVideos([]);
 			setAnnouncements([]);
-			setIsLoadingList(false);
 			return;
 		}
 
@@ -369,7 +342,6 @@ export default function AdminPage() {
 		setVideos((videoResult.data ?? []) as VideoItem[]);
 		setAnnouncements((announcementResult.data ?? []) as AnnouncementItem[]);
 		await fetchManagementData();
-		setIsLoadingList(false);
 	}, [fetchManagementData]);
 
 	useEffect(() => {

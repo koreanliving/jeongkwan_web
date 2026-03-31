@@ -9,13 +9,7 @@ import { getStudentSession, isAdminRequest } from "@/utils/server/studentSession
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import type { ExamKind } from "@/utils/examKinds";
 import { isValidUuid } from "@/utils/uuidValidation";
-
-function parseStudentIdParam(searchParams: URLSearchParams): string | null {
-	const raw = searchParams.get("studentId");
-	if (raw === null || raw === "") return null;
-	const id = raw.trim();
-	return isValidUuid(id) ? id : null;
-}
+import { parseStudentIdParam } from "@/utils/server/parseStudentId";
 
 async function getExamRecordOwnerStudentId(recordId: number): Promise<string | null> {
 	const { data, error } = await supabaseAdmin

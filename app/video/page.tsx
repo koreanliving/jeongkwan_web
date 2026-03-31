@@ -6,6 +6,7 @@ import { AppTopBar } from "@/components/AppTopBar";
 import { StudentCategoryTabs } from "@/components/StudentCategoryTabs";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { getYoutubeThumbnailUrl } from "@/lib/youtube";
+import { toKoreanDate } from "@/utils/dateFormat";
 import { supabase } from "../../utils/supabase";
 import { Play, Search } from "lucide-react";
 
@@ -25,14 +26,6 @@ type HomeSetting = {
 	id: number;
 	show_post_dates: boolean;
 };
-
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
 
 export default function VideoPage() {
 	const [activeTab, setActiveTab] = useState<CategoryTab>("전체");

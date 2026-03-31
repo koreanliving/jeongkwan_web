@@ -7,6 +7,7 @@ import { BottomTabNav } from "@/components/BottomTabNav";
 import { AppTopBar } from "@/components/AppTopBar";
 import { StudentCategoryTabs } from "@/components/StudentCategoryTabs";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
+import { toKoreanDate } from "@/utils/dateFormat";
 import { supabase } from "../../utils/supabase";
 
 const categoryTabs = ["전체", "문학", "비문학"] as const;
@@ -27,14 +28,6 @@ type HomeSetting = {
 	id: number;
 	show_post_dates: boolean;
 };
-
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
 
 function MaterialRowSkeleton() {
 	return (

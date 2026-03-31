@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import { AppTopBar } from "@/components/AppTopBar";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
+import { toKoreanDate } from "@/utils/dateFormat";
 import { supabase } from "../../utils/supabase";
 import { CheckCircle2, Send, UserRound } from "lucide-react";
 
@@ -33,14 +34,6 @@ type HomeSetting = {
 	id: number;
 	show_post_dates: boolean;
 };
-
-function toKoreanDate(value: string) {
-	return new Date(value).toLocaleDateString("ko-KR", {
-		year: "numeric",
-		month: "long",
-		day: "numeric",
-	});
-}
 
 export default function RequestPage() {
 	const [studentLabel, setStudentLabel] = useState("");
