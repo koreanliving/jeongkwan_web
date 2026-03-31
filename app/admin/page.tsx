@@ -2,10 +2,11 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ClipboardList, ImagePlus, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { CheckCircle2, Circle, ClipboardList, ImagePlus, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
+import type { MaterialViewRow } from "@/app/api/admin/student-material-views/route";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import { supabase } from "../../utils/supabase";
 
@@ -253,6 +254,9 @@ export default function AdminPage() {
 	const [studentDetailModal, setStudentDetailModal] = useState<StudentItem | null>(null);
 	const [detailExamRecords, setDetailExamRecords] = useState<ExamRecord[]>([]);
 	const [detailMemos, setDetailMemos] = useState<Memo[]>([]);
+	const [detailMaterialViews, setDetailMaterialViews] = useState<MaterialViewRow[]>([]);
+	const [detailMaterialViewsError, setDetailMaterialViewsError] = useState("");
+	const [detailMaterialViewsFilter, setDetailMaterialViewsFilter] = useState<"전체" | "문학" | "비문학">("전체");
 	const [detailLoading, setDetailLoading] = useState(false);
 	const [detailExamError, setDetailExamError] = useState("");
 	const [detailMemoError, setDetailMemoError] = useState("");
@@ -878,6 +882,9 @@ export default function AdminPage() {
 		setStudentDetailModal(null);
 		setDetailExamRecords([]);
 		setDetailMemos([]);
+		setDetailMaterialViews([]);
+		setDetailMaterialViewsError("");
+		setDetailMaterialViewsFilter("전체");
 		setDetailLoading(false);
 		setDetailExamError("");
 		setDetailMemoError("");
@@ -934,14 +941,19 @@ export default function AdminPage() {
 		setDetailDeletingExamId(null);
 		setDetailExamRecords([]);
 		setDetailMemos([]);
+		setDetailMaterialViews([]);
+		setDetailMaterialViewsError("");
+		setDetailMaterialViewsFilter("전체");
 
 		const sid = encodeURIComponent(student.id);
-		const [exRes, memRes] = await Promise.all([
+		const [exRes, memRes, mvRes] = await Promise.all([
 			fetch(`/api/exam-records?studentId=${sid}`, { cache: "no-store" }),
 			fetch(`/api/memos?studentId=${sid}`, { cache: "no-store" }),
+			fetch(`/api/admin/student-material-views?studentId=${sid}`, { cache: "no-store" }),
 		]);
 		const exJson = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
 		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
+		const mvJson = (await mvRes.json()) as { items?: MaterialViewRow[]; message?: string };
 
 		setDetailLoading(false);
 
@@ -957,6 +969,13 @@ export default function AdminPage() {
 			setDetailMemos([]);
 		} else {
 			setDetailMemos(memJson.memos ?? []);
+		}
+
+		if (!mvRes.ok) {
+			setDetailMaterialViewsError(mvJson.message ?? "자료 열람 기록을 불러오지 못했습니다.");
+			setDetailMaterialViews([]);
+		} else {
+			setDetailMaterialViews(mvJson.items ?? []);
 		}
 	};
 
@@ -2148,10 +2167,52 @@ export default function AdminPage() {
 										{memoSubmitting ? "등록 중…" : "메모 추가"}
 									</button>
 								</form>
-							</section>
-						</div>
+						</section>
+
+						<section className="mt-4 border-t border-zinc-100 pt-4">
+							<h3 className="text-sm font-semibold text-zinc-900">자료 열람 현황</h3>
+							<div className="mt-2 flex gap-1">
+								{(["전체", "문학", "비문학"] as const).map((cat) => (
+									<button
+										key={cat}
+										type="button"
+										onClick={() => setDetailMaterialViewsFilter(cat)}
+										className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition ${detailMaterialViewsFilter === cat ? "bg-zinc-800 text-white" : "border border-zinc-300 bg-white text-zinc-600 hover:bg-zinc-100"}`}
+									>
+										{cat}
+									</button>
+								))}
+							</div>
+							{detailMaterialViewsError ? (
+								<p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailMaterialViewsError}</p>
+							) : null}
+							{!detailLoading && !detailMaterialViewsError && detailMaterialViews.length === 0 ? (
+								<p className="mt-2 text-sm text-zinc-500">자료가 없습니다.</p>
+							) : null}
+							<ul className="mt-2 max-h-56 space-y-1.5 overflow-y-auto">
+								{detailMaterialViews
+									.filter((m) => detailMaterialViewsFilter === "전체" || m.category === detailMaterialViewsFilter)
+									.map((m) => (
+										<li key={m.id} className="flex items-start gap-2 rounded-xl border border-zinc-100 bg-zinc-50 px-3 py-2">
+											{m.viewed ? (
+												<CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+											) : (
+												<Circle className="mt-0.5 h-4 w-4 shrink-0 text-zinc-300" />
+											)}
+											<div className="min-w-0 flex-1">
+												<p className="truncate text-sm font-medium text-zinc-900">{m.title}</p>
+												<p className="mt-0.5 text-[11px] text-zinc-400">
+													{m.category}
+													{m.viewed && m.viewed_at ? ` · 열람 ${toKoreanDate(m.viewed_at)}` : " · 미열람"}
+												</p>
+											</div>
+										</li>
+									))}
+							</ul>
+						</section>
 					</div>
-				) : null}
+				</div>
+			) : null}
 
 				{listError ? <p className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{listError}</p> : null}
 			</div>
