@@ -215,12 +215,12 @@ export default function HomePage() {
 							<p className="mt-1.5 text-sm font-medium leading-snug text-slate-500 sm:text-base">{targetSubtitle}</p>
 						</div>
 						<div className="hidden shrink-0 md:block">
-							<div className="h-[110px] w-[92px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-300/50">
+							<div className="h-[132px] w-[110px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-300/50">
 								<Image
 									src="/instructor-profile.png"
 									alt="강사 프로필 사진"
-									width={92}
-									height={110}
+									width={110}
+									height={132}
 									className="h-full w-full object-cover object-top"
 									priority
 								/>
