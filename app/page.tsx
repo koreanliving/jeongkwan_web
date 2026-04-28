@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ChevronRight, FileText, Shuffle, UserRound, X } from "lucide-react";
 import { supabase } from "../utils/supabase";
 import { BottomTabNav } from "@/components/BottomTabNav";
@@ -205,13 +206,25 @@ export default function HomePage() {
 
 			<div className="app-home-top border-b border-slate-200/80 py-10 sm:py-12 md:py-14 pt-6 sm:pt-8">
 				<div className={`${STUDENT_APP_SHELL}`}>
-					<div className="flex items-center gap-4 sm:gap-5">
-						<div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand sm:h-[4.5rem] sm:w-[4.5rem]">
-							<UserRound className="h-8 w-8 sm:h-9 sm:w-9" strokeWidth={2} aria-hidden />
+					<div className="flex items-center gap-3 sm:gap-5">
+						<div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-brand/10 text-brand sm:h-[4.5rem] sm:w-[4.5rem]">
+							<UserRound className="h-7 w-7 sm:h-9 sm:w-9" strokeWidth={2} aria-hidden />
 						</div>
 						<div className="min-w-0 flex-1">
 							<p className="text-lg font-bold leading-snug tracking-tight text-slate-900 sm:text-xl md:text-2xl">{welcomeHeadline}</p>
 							<p className="mt-1.5 text-sm font-medium leading-snug text-slate-500 sm:text-base">{targetSubtitle}</p>
+						</div>
+						<div className="hidden shrink-0 md:block">
+							<div className="h-[110px] w-[92px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-300/50">
+								<Image
+									src="/instructor-profile.png"
+									alt="강사 프로필 사진"
+									width={92}
+									height={110}
+									className="h-full w-full object-cover object-top"
+									priority
+								/>
+							</div>
 						</div>
 					</div>
 				</div>
