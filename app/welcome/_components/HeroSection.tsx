@@ -21,19 +21,25 @@ export function HeroSection() {
 		<section className="relative w-full overflow-hidden bg-black">
 			<div className="relative min-h-[100svh] w-full sm:min-h-[95vh] lg:min-h-screen">
 				{!imgFailed ? (
-					<Image
-						src={HERO.src}
-						alt={HERO.alt}
-						fill
-						className={`object-cover ${!reduceMotion ? "animate-hero-ken-burns" : ""}`}
-						style={{ objectPosition: HERO.objectPosition }}
-						sizes="100vw"
-						priority
-						onError={() => setImgFailed(true)}
-					/>
+					/* 모바일: 이미지를 70% 크기로 줄여 얼굴이 잘리지 않도록, sm 이상은 원래대로 */
+					<div className="absolute inset-0 flex items-start justify-center sm:contents">
+						<div className="relative h-[70%] w-[70%] sm:absolute sm:inset-0 sm:h-full sm:w-full">
+							<Image
+								src={HERO.src}
+								alt={HERO.alt}
+								fill
+								className={`object-cover object-top sm:object-cover ${!reduceMotion ? "animate-hero-ken-burns" : ""}`}
+								style={{ objectPosition: HERO.objectPosition }}
+								sizes="100vw"
+								priority
+								onError={() => setImgFailed(true)}
+							/>
+						</div>
+					</div>
 				) : (
 					<div className="absolute inset-0 bg-neutral-900" />
-				)}
+				)
+				}
 
 				<div
 					className="pointer-events-none absolute inset-0"
@@ -61,8 +67,8 @@ export function HeroSection() {
 				</div>
 			</div>
 
-			{/* 우측 하단 이력 */}
-			<ul className="absolute bottom-2 right-24 list-none space-y-0 text-right sm:bottom-3 sm:right-36" aria-label="강사 경력">
+		{/* 우측 하단 이력 — 모바일: right-8(7글자만큼 이동), sm+: right-36 */}
+		<ul className="absolute bottom-2 right-8 list-none space-y-0 text-right sm:bottom-3 sm:right-36" aria-label="강사 경력">
 				{["입시왕 수능 국어 강사", "라파에듀 수능 국어 강사", "서정학원 수능 국어 강사", "다올 105 수능 국어 강사"].map((line) => (
 					<li key={line} className="text-[12px] font-medium leading-[1.35] tracking-wide text-white/65 sm:text-[13.5px]">
 						{line}

@@ -45,7 +45,7 @@ export function PhilosophySection() {
 				</Reveal>
 
 				<Reveal delayMs={120} className="mt-20 sm:mt-24">
-					<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">Why your score stops</p>
+					<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">문제의 원인</p>
 					<div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2">
 						{reasons.map((it, i) => (
 							<Reveal key={it.n} delayMs={i * 90} className="bg-[#0B1B3A]">
@@ -62,7 +62,7 @@ export function PhilosophySection() {
 				</Reveal>
 
 				<Reveal delayMs={120} className="mt-16 sm:mt-20">
-					<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">How we fix it</p>
+					<p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-white/45">해결 방법</p>
 					<div className="mt-8 grid gap-px bg-white/10 sm:grid-cols-2">
 						{solutions.map((it, i) => (
 							<Reveal key={it.n} delayMs={i * 90} className="bg-[#0B1B3A]">

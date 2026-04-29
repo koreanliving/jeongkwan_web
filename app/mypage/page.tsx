@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell, Pencil, Trash2 } from "lucide-react";
 import { AppTopBar } from "@/components/AppTopBar";
 import { BottomTabNav } from "@/components/BottomTabNav";
@@ -21,6 +22,7 @@ type HomeSetting = {
 };
 
 export default function MyPage() {
+	const router = useRouter();
 	const [auth, setAuth] = useState<"unknown" | "guest" | "user">("unknown");
 	const [records, setRecords] = useState<ExamRecord[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
@@ -130,6 +132,19 @@ export default function MyPage() {
 	useEffect(() => {
 		void bootstrap();
 	}, [bootstrap]);
+
+	const handleLogout = useCallback(async () => {
+		try {
+			await fetch("/api/auth/student-logout", { method: "POST", credentials: "same-origin" });
+		} finally {
+			await supabase.auth.signOut();
+			setAuth("guest");
+			setStudentLabel("");
+			setStudentInfo(null);
+			setRecords([]);
+			router.replace("/login");
+		}
+	}, [router]);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -344,9 +359,22 @@ export default function MyPage() {
 			/>
 
 			<div className={`${STUDENT_APP_SHELL} space-y-4 pt-3 sm:space-y-5 sm:pt-4`}>
-				<p className={`${studentComicCard} p-4 text-sm font-semibold tracking-tight text-zinc-700`}>
-					나의 성적을 확인하고 기록할 수 있습니다.
-				</p>
+				<div
+					className={`${studentComicCard} flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between`}
+				>
+					<p className="min-w-0 flex-1 text-sm font-semibold tracking-tight text-zinc-700">
+						나의 성적을 확인하고 기록할 수 있습니다.
+					</p>
+					{auth === "user" ? (
+						<button
+							type="button"
+							onClick={() => void handleLogout()}
+							className="comic-border inline-flex min-h-10 shrink-0 touch-manipulation items-center justify-center self-stretch rounded-xl border border-zinc-200/90 bg-white px-4 text-sm font-extrabold tracking-tight text-zinc-800 shadow-sm transition hover:bg-zinc-50 active:scale-[0.99] sm:self-auto"
+						>
+							로그아웃
+						</button>
+					) : null}
+				</div>
 
 				{auth === "guest" ? (
 					<section className={`${studentComicCard} p-5 md:p-6`}>
