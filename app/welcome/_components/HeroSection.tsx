@@ -20,17 +20,15 @@ export function HeroSection() {
 
 	return (
 		<section className="relative w-full overflow-hidden bg-black">
-			<div className="relative flex min-h-[100svh] w-full flex-col bg-black md:min-h-[95vh] lg:min-h-screen">
-				{/* 사진: 모바일은 상체 위주 높이 제한, md+ 풀블리드 */}
-				<div
-					className="relative w-full shrink-0 overflow-hidden bg-black max-md:h-[min(46svh,400px)] max-md:max-h-[52vh] max-md:min-h-[260px] md:absolute md:inset-0 md:h-full md:max-h-none md:min-h-[95vh] lg:min-h-screen"
-				>
+			<div className="relative min-h-[100svh] w-full md:min-h-[95vh] lg:min-h-screen">
+				{/* 사진 풀블리드 */}
+				<div className="absolute inset-0 overflow-hidden bg-black">
 					{!imgFailed ? (
 						<Image
 							src={HERO.src}
 							alt={HERO.alt}
 							fill
-							className={`max-md:object-cover max-md:object-[62%_18%] md:object-cover md:object-[center_22%] object-center ${photoMotion}`}
+							className={`object-cover max-md:object-[62%_18%] md:object-[center_22%] ${photoMotion}`}
 							sizes="100vw"
 							priority
 							onError={() => setImgFailed(true)}
@@ -48,7 +46,6 @@ export function HeroSection() {
 						aria-hidden
 					/>
 
-					{/* 이력: 사진 영역 기준 우하단 */}
 					<ul
 						className="absolute bottom-2 right-0 z-10 flex max-md:pr-5 list-none flex-col items-end space-y-0 text-right md:bottom-3 md:right-36 md:pr-0"
 						aria-label="강사 경력"
@@ -61,9 +58,9 @@ export function HeroSection() {
 					</ul>
 				</div>
 
-				{/* 카피: 모바일은 사진 아래 블랙 영역, md+는 오버레이 */}
-				<div className="relative z-[2] mt-auto flex min-h-0 flex-1 flex-col justify-end bg-black px-5 pb-8 pt-5 md:absolute md:inset-0 md:mt-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0">
-					<div className="mx-auto w-full max-w-6xl md:px-5 md:pb-[min(16vh,7rem)] lg:px-10 lg:pb-[min(14vh,6.5rem)]">
+				{/* 카피: 모바일·PC 동일 — 사진 위 하단 오버레이 */}
+				<div className="pointer-events-none absolute inset-0 z-[2] flex flex-col justify-end">
+					<div className="pointer-events-auto mx-auto w-full max-w-6xl px-5 pb-[min(15vh,6rem)] sm:px-10 sm:pb-[min(16vh,7rem)] lg:pb-[min(14vh,6.5rem)]">
 						<h1 className="welcome-serif break-keep whitespace-nowrap text-[clamp(0.875rem,4.165vw,3.185rem)] font-bold leading-[0.97] tracking-[-0.03em] text-white [text-shadow:0_4px_60px_rgb(0_0_0/0.5)]">
 							국어의 본질을 꿰뚫는 가장 확실한 시선
 						</h1>
