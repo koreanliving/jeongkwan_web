@@ -46,8 +46,8 @@ export function HeroSection() {
 
 			<div className="absolute inset-0 flex flex-col justify-end">
 				<div className="mx-auto w-full max-w-6xl px-5 pb-[min(15vh,6rem)] sm:px-10 sm:pb-[min(16vh,7rem)] lg:pb-[min(14vh,6.5rem)]">
-					<h1 className="welcome-serif break-keep whitespace-nowrap text-[clamp(1.25rem,5.95vw,4.55rem)] font-bold leading-[0.97] tracking-[-0.03em] text-white [text-shadow:0_4px_60px_rgb(0_0_0/0.5)]">
-						맹목적인 읽기를 멈추다.
+					<h1 className="welcome-serif break-keep whitespace-nowrap text-[clamp(0.875rem,4.165vw,3.185rem)] font-bold leading-[0.97] tracking-[-0.03em] text-white [text-shadow:0_4px_60px_rgb(0_0_0/0.5)]">
+					국어의 본질을 꿰뚫는 가장 확실한 시선
 					</h1>
 
 					<div className="mt-6 sm:mt-8">
