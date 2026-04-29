@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 const HERO = {
 	src: "/assets/profile.JPG",
 	alt: "이정관 선생님",
-	objectPosition: "center 22%" as const,
 };
 
 export function HeroSection() {
@@ -28,8 +27,7 @@ export function HeroSection() {
 								src={HERO.src}
 								alt={HERO.alt}
 								fill
-								className={`object-cover object-top sm:object-cover ${!reduceMotion ? "animate-hero-ken-burns" : ""}`}
-								style={{ objectPosition: HERO.objectPosition }}
+								className={`object-cover max-md:object-[42%_22%] md:object-[center_22%] ${!reduceMotion ? "animate-hero-ken-burns" : ""}`}
 								sizes="100vw"
 								priority
 								onError={() => setImgFailed(true)}
@@ -67,8 +65,11 @@ export function HeroSection() {
 				</div>
 			</div>
 
-		{/* 우측 하단 이력 — 모바일: right-8(7글자만큼 이동), sm+: right-36 */}
-		<ul className="absolute bottom-2 right-8 list-none space-y-0 text-right sm:bottom-3 sm:right-36" aria-label="강사 경력">
+		{/* 이력: 우측 정렬, 모바일은 화면 오른쪽과 동일 여백(px-5) */}
+		<ul
+			className="absolute bottom-2 right-0 z-10 flex max-md:pr-5 list-none flex-col items-end space-y-0 text-right md:bottom-3 md:right-36 md:pr-0"
+			aria-label="강사 경력"
+		>
 				{["입시왕 수능 국어 강사", "라파에듀 수능 국어 강사", "서정학원 수능 국어 강사", "다올 105 수능 국어 강사"].map((line) => (
 					<li key={line} className="text-[12px] font-medium leading-[1.35] tracking-wide text-white/65 sm:text-[13.5px]">
 						{line}

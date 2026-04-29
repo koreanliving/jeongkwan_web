@@ -58,7 +58,7 @@ export function CurriculumSection() {
 			<div className="mx-auto max-w-6xl px-5 sm:px-10">
 				<Reveal>
 					<p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-neutral-500">
-						Annual Curriculum
+						연간 커리 큘럼
 					</p>
 					<div className="mt-10 lg:flex lg:items-end lg:justify-between lg:gap-16">
 						<h2 className="welcome-serif max-w-[18ch] text-[clamp(1.4rem,3.85vw,2.625rem)] font-bold leading-[1.05] tracking-[-0.03em]">
