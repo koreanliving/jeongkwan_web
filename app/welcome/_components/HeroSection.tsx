@@ -23,14 +23,14 @@ export function HeroSection() {
 			<div className="relative flex min-h-[100svh] w-full flex-col bg-black md:min-h-[95vh] lg:min-h-screen">
 				{/* 사진: 모바일은 상체 위주 높이 제한, md+ 풀블리드 */}
 				<div
-					className="relative w-full shrink-0 overflow-hidden bg-neutral-950 max-md:h-[min(42svh,360px)] max-md:max-h-[46vh] max-md:min-h-[248px] md:absolute md:inset-0 md:h-full md:max-h-none md:min-h-[95vh] lg:min-h-screen"
+					className="relative w-full shrink-0 overflow-hidden bg-black max-md:h-[min(46svh,400px)] max-md:max-h-[52vh] max-md:min-h-[260px] md:absolute md:inset-0 md:h-full md:max-h-none md:min-h-[95vh] lg:min-h-screen"
 				>
 					{!imgFailed ? (
 						<Image
 							src={HERO.src}
 							alt={HERO.alt}
 							fill
-							className={`object-center max-md:object-contain max-md:object-[58%_18%] md:object-cover md:object-[center_22%] ${photoMotion}`}
+							className={`max-md:object-cover max-md:object-[62%_18%] md:object-cover md:object-[center_22%] object-center ${photoMotion}`}
 							sizes="100vw"
 							priority
 							onError={() => setImgFailed(true)}
