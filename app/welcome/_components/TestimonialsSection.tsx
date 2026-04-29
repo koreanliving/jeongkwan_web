@@ -67,10 +67,10 @@ export function TestimonialsSection() {
 				{/* 인용문 — 마키 클릭 시 교체 */}
 				<div className="mt-16 sm:mt-20 lg:mt-24">
 					<div className="border-t border-black/[0.08] pt-12 sm:pt-16">
-						<span className="welcome-serif block text-[5rem] leading-none text-neutral-200 sm:text-[7rem]">"</span>
+						<span className="welcome-serif block text-[4.5rem] leading-none text-neutral-200 sm:text-[6.3rem]">"</span>
 						<blockquote
 							key={active.quote}
-							className="welcome-serif -mt-6 max-w-3xl whitespace-pre-line text-[clamp(1.2rem,2.56vw,2rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#0a0a0a] transition-opacity duration-300 sm:-mt-8"
+							className="welcome-serif -mt-6 max-w-3xl whitespace-pre-line text-[clamp(1.08rem,2.304vw,1.8rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#0a0a0a] transition-opacity duration-300 sm:-mt-8"
 						>
 							{active.quote}
 						</blockquote>

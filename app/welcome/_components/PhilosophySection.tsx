@@ -6,7 +6,7 @@ const reasons = [
 	{
 		n: "01",
 		title: "문제 풀이만의 반복",
-		body: "독해 능력은 단순히 문제를 많이 푸는 것만으로 자라지 않습니다. 그러나 대부분의 학생은 문제풀이만 반복하며 시간을 흘려보냅니다.",
+		body: "독해 능력은 단순히 문제를 많이 푸는 것만으로 성장하지 않습니다. 그러나 대부분의 학생은 문제풀이만 반복하며 시간을 흘려보냅니다.",
 	},
 	{
 		n: "02",
@@ -37,7 +37,7 @@ export function PhilosophySection() {
 			<div className="mx-auto max-w-6xl px-5 sm:px-10">
 				<Reveal>
 					<p className="text-[11px] font-semibold uppercase tracking-[0.32em] text-white/45">Philosophy</p>
-					<h2 className="welcome-serif mt-8 break-keep text-[clamp(2rem,5.5vw,3.75rem)] font-bold leading-[1.08] tracking-[-0.03em]">
+					<h2 className="welcome-serif mt-8 break-keep text-[clamp(1.8rem,4.95vw,3.375rem)] font-bold leading-[1.08] tracking-[-0.03em] md:text-[clamp(2rem,5.5vw,3.75rem)]">
 						노력해도 성적이 오르지 않는 이유,
 						<br />
 						그리고 다시 본질로 가는 길.
