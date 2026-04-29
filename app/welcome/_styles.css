@@ -1,0 +1,55 @@
+/* /welcome 전용 — globals.css 미수정 */
+
+.welcome-root {
+	font-family: var(--font-welcome-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+.welcome-serif {
+	font-family: var(--font-welcome-serif), ui-serif, "Apple SD Gothic Neo", serif;
+}
+
+@keyframes welcome-hero-ken-burns {
+	from {
+		transform: scale(1);
+	}
+	to {
+		transform: scale(1.07);
+	}
+}
+
+.animate-hero-ken-burns {
+	animation: welcome-hero-ken-burns 18s ease-out forwards;
+	transform-origin: center center;
+	will-change: transform;
+}
+
+@keyframes welcome-marquee {
+	from { transform: translateX(0); }
+	to   { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+	display: flex;
+	animation: welcome-marquee 28s linear infinite;
+	will-change: transform;
+}
+
+.marquee-track:hover .animate-marquee {
+	animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.welcome-reveal {
+		opacity: 1 !important;
+		transform: none !important;
+		transition: none !important;
+	}
+
+	.animate-hero-ken-burns {
+		animation: none !important;
+	}
+
+	.animate-marquee {
+		animation: none !important;
+	}
+}

@@ -2,7 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Circle, ClipboardList, ImagePlus, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Video } from "lucide-react";
+import { CheckCircle2, Circle, ClipboardList, ImagePlus, MessageSquareText, Pencil, Save, Trash2, Upload, UserRound, Users, Video } from "lucide-react";
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
@@ -18,7 +18,7 @@ import { getYoutubeEmbedUrl } from "@/lib/youtube";
 import { toKoreanDate } from "@/utils/dateFormat";
 
 type Category = "문학" | "비문학";
-type AdminTab = "materials" | "videos" | "main" | "members" | "requests";
+type AdminTab = "materials" | "videos" | "main" | "members" | "groups" | "requests";
 
 type MaterialItem = {
 	id: number;
@@ -92,6 +92,66 @@ type SignupRequestItem = {
 	selected_subject: string | null;
 	status: "대기" | "승인" | "거절";
 	admin_note: string | null;
+	created_at: string;
+	updated_at: string;
+};
+
+type ParentSignupRequestItem = {
+	id: number;
+	username: string;
+	password: string;
+	parent_name: string;
+	phone: string;
+	student_name: string;
+	academy: string;
+	status: "대기" | "승인" | "거절";
+	admin_note: string | null;
+	created_at: string;
+	updated_at: string;
+};
+
+type ParentAccountItem = {
+	id: string;
+	username: string;
+	name: string;
+	phone: string;
+	linked_student_id: string;
+	student_name: string;
+	student_username: string;
+	is_approved: boolean;
+	created_at: string;
+};
+
+type ParentRequestAdminItem = {
+	id: number;
+	parent_id: string;
+	parent_username: string;
+	parent_name: string;
+	request_type: "보강영상" | "질문" | "상담";
+	title: string;
+	content: string;
+	status: "접수" | "처리중" | "완료";
+	admin_reply: string | null;
+	support_video_url: string | null;
+	is_deleted: boolean;
+	created_at: string;
+	updated_at: string;
+};
+
+type ClassGroupAdminItem = {
+	id: number;
+	name: string;
+	description: string | null;
+	created_at: string;
+	updated_at: string;
+	student_ids: string[];
+};
+
+type ClassReportItem = {
+	id: number;
+	group_id: number;
+	week_label: string;
+	content: string;
 	created_at: string;
 	updated_at: string;
 };
@@ -225,6 +285,44 @@ export default function AdminPage() {
 	const [isProcessingSignupId, setIsProcessingSignupId] = useState<number | null>(null);
 	const [isDeletingSignupId, setIsDeletingSignupId] = useState<number | null>(null);
 	const [isDeletingRequestId, setIsDeletingRequestId] = useState<number | null>(null);
+	const [parentRequests, setParentRequests] = useState<ParentRequestAdminItem[]>([]);
+	const [parentRequestsError, setParentRequestsError] = useState("");
+	const [parentRequestsMessage, setParentRequestsMessage] = useState("");
+	const [isSavingParentRequestId, setIsSavingParentRequestId] = useState<number | null>(null);
+	const [isDeletingParentRequestId, setIsDeletingParentRequestId] = useState<number | null>(null);
+	const [parentSignupRequests, setParentSignupRequests] = useState<ParentSignupRequestItem[]>([]);
+	const [parentSignupError, setParentSignupError] = useState("");
+	const [parentSignupMessage, setParentSignupMessage] = useState("");
+	const [isProcessingParentSignupId, setIsProcessingParentSignupId] = useState<number | null>(null);
+	const [isDeletingParentSignupId, setIsDeletingParentSignupId] = useState<number | null>(null);
+	const [parentLinkChoice, setParentLinkChoice] = useState<Record<number, string>>({});
+	const [parentAccounts, setParentAccounts] = useState<ParentAccountItem[]>([]);
+	const [parentAccountsError, setParentAccountsError] = useState("");
+	const [parentAccountsMessage, setParentAccountsMessage] = useState("");
+	const [parentPasswordDraft, setParentPasswordDraft] = useState<Record<string, string>>({});
+	const [isDeletingParentAccountId, setIsDeletingParentAccountId] = useState<string | null>(null);
+	const [isSavingParentPasswordId, setIsSavingParentPasswordId] = useState<string | null>(null);
+	const [classGroups, setClassGroups] = useState<ClassGroupAdminItem[]>([]);
+	const [groupsError, setGroupsError] = useState("");
+	const [groupsMessage, setGroupsMessage] = useState("");
+	const [newGroupName, setNewGroupName] = useState("");
+	const [newGroupDesc, setNewGroupDesc] = useState("");
+	const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+	const [groupStudentDraft, setGroupStudentDraft] = useState<Record<number, string[]>>({});
+	const [groupMetaDraft, setGroupMetaDraft] = useState<Record<number, { name: string; description: string }>>({});
+	const [savingGroupId, setSavingGroupId] = useState<number | null>(null);
+	const [deletingGroupId, setDeletingGroupId] = useState<number | null>(null);
+	const [reportGroupId, setReportGroupId] = useState<number | null>(null);
+	const [classReports, setClassReports] = useState<ClassReportItem[]>([]);
+	const [reportsLoading, setReportsLoading] = useState(false);
+	const [newReportWeek, setNewReportWeek] = useState("");
+	const [newReportContent, setNewReportContent] = useState("");
+	const [isCreatingReport, setIsCreatingReport] = useState(false);
+	const [deletingReportId, setDeletingReportId] = useState<number | null>(null);
+	const [editingReportId, setEditingReportId] = useState<number | null>(null);
+	const [editReportWeek, setEditReportWeek] = useState("");
+	const [editReportContent, setEditReportContent] = useState("");
+	const [savingReportId, setSavingReportId] = useState<number | null>(null);
 
 	const [studentDetailModal, setStudentDetailModal] = useState<StudentItem | null>(null);
 	const [detailExamRecords, setDetailExamRecords] = useState<ExamRecord[]>([]);
@@ -266,11 +364,34 @@ export default function AdminPage() {
 	const previewTextBlocks = parsedPreview.blocks.filter((b) => b.type === "text").length;
 	const previewImageBlocks = parsedPreview.blocks.filter((b) => b.type === "image").length;
 
+	const resolveParentLink = useCallback(
+		(item: ParentSignupRequestItem): string => {
+			if (item.status !== "대기") return "";
+			const manual = parentLinkChoice[item.id];
+			if (manual !== undefined) return manual;
+			const matches = students.filter((s) => s.is_approved && s.name.trim() === item.student_name.trim());
+			return matches.length === 1 ? matches[0].id : "";
+		},
+		[students, parentLinkChoice],
+	);
+
 	const fetchManagementData = useCallback(async () => {
-		const [studentsResponse, requestsResponse, signupResponse] = await Promise.all([
+		const [
+			studentsResponse,
+			requestsResponse,
+			signupResponse,
+			parentSignupResponse,
+			classGroupsResponse,
+			parentRequestsResponse,
+			parentAccountsResponse,
+		] = await Promise.all([
 			fetch("/api/admin/students", { cache: "no-store" }),
 			fetch("/api/admin/requests", { cache: "no-store" }),
 			fetch("/api/admin/signup", { cache: "no-store" }),
+			fetch("/api/admin/parent-signup", { cache: "no-store" }),
+			fetch("/api/admin/class-groups", { cache: "no-store" }),
+			fetch("/api/admin/parent-requests", { cache: "no-store" }),
+			fetch("/api/admin/parent-accounts", { cache: "no-store" }),
 		]);
 
 		const studentsResult = (await studentsResponse.json()) as {
@@ -280,6 +401,25 @@ export default function AdminPage() {
 		};
 		const requestsResult = (await requestsResponse.json()) as { requests?: StudentRequestItem[]; message?: string };
 		const signupResult = (await signupResponse.json()) as { signupRequests?: SignupRequestItem[]; message?: string };
+		const parentSignupResult = (await parentSignupResponse.json()) as {
+			parentSignupRequests?: ParentSignupRequestItem[];
+			message?: string;
+			detail?: string;
+		};
+		const classGroupsResult = (await classGroupsResponse.json()) as {
+			groups?: ClassGroupAdminItem[];
+			message?: string;
+			detail?: string;
+		};
+		const parentRequestsResult = (await parentRequestsResponse.json()) as {
+			requests?: ParentRequestAdminItem[];
+			message?: string;
+		};
+		const parentAccountsResult = (await parentAccountsResponse.json()) as {
+			accounts?: ParentAccountItem[];
+			message?: string;
+			detail?: string;
+		};
 
 		if (!studentsResponse.ok) {
 			const base = studentsResult.message ?? "학생 목록을 불러오지 못했습니다.";
@@ -304,6 +444,50 @@ export default function AdminPage() {
 		} else {
 			setSignupError("");
 			setSignupRequests(signupResult.signupRequests ?? []);
+		}
+
+		if (!parentSignupResponse.ok) {
+			const base = parentSignupResult.message ?? "학부모 가입신청 목록을 불러오지 못했습니다.";
+			setParentSignupError(parentSignupResult.detail ? `${base} (${parentSignupResult.detail})` : base);
+			setParentSignupRequests([]);
+		} else {
+			setParentSignupError("");
+			setParentSignupRequests(parentSignupResult.parentSignupRequests ?? []);
+		}
+
+		if (!classGroupsResponse.ok) {
+			const base = classGroupsResult.message ?? "수업반 목록을 불러오지 못했습니다.";
+			setGroupsError(classGroupsResult.detail ? `${base} (${classGroupsResult.detail})` : base);
+			setClassGroups([]);
+			setGroupStudentDraft({});
+			setGroupMetaDraft({});
+		} else {
+			setGroupsError("");
+			const list = classGroupsResult.groups ?? [];
+			setClassGroups(list);
+			setGroupStudentDraft(Object.fromEntries(list.map((g) => [g.id, [...g.student_ids]])));
+			setGroupMetaDraft(
+				Object.fromEntries(
+					list.map((g) => [g.id, { name: g.name, description: g.description ?? "" }]),
+				),
+			);
+		}
+
+		if (!parentRequestsResponse.ok) {
+			setParentRequestsError(parentRequestsResult.message ?? "학부모 문의 목록을 불러오지 못했습니다.");
+			setParentRequests([]);
+		} else {
+			setParentRequestsError("");
+			setParentRequests(parentRequestsResult.requests ?? []);
+		}
+
+		if (!parentAccountsResponse.ok) {
+			const base = parentAccountsResult.message ?? "학부모 계정 목록을 불러오지 못했습니다.";
+			setParentAccountsError(parentAccountsResult.detail ? `${base} — ${parentAccountsResult.detail}` : base);
+			setParentAccounts([]);
+		} else {
+			setParentAccountsError("");
+			setParentAccounts(parentAccountsResult.accounts ?? []);
 		}
 	}, []);
 
@@ -347,6 +531,39 @@ export default function AdminPage() {
 	useEffect(() => {
 		void fetchAdminData();
 	}, [fetchAdminData]);
+
+	useEffect(() => {
+		if (activeTab !== "groups") return;
+		if (classGroups.length === 0) {
+			setReportGroupId(null);
+			return;
+		}
+		setReportGroupId((prev) => (prev !== null && classGroups.some((g) => g.id === prev) ? prev : classGroups[0].id));
+	}, [activeTab, classGroups]);
+
+	useEffect(() => {
+		setEditingReportId(null);
+		setEditReportWeek("");
+		setEditReportContent("");
+		if (reportGroupId === null) {
+			setClassReports([]);
+			return;
+		}
+		let cancelled = false;
+		(async () => {
+			setReportsLoading(true);
+			const res = await fetch(`/api/admin/class-reports?groupId=${reportGroupId}`, { cache: "no-store" });
+			const json = (await res.json()) as { reports?: ClassReportItem[] };
+			if (!cancelled) {
+				setReportsLoading(false);
+				if (res.ok) setClassReports(json.reports ?? []);
+				else setClassReports([]);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [reportGroupId]);
 
 	const uploadPdfToStorage = async (materialId: number, file: File) => {
 		const cleanedName = safeFileName(file.name);
@@ -1282,6 +1499,356 @@ export default function AdminPage() {
 		await fetchManagementData();
 	};
 
+	const handleApproveParentSignup = async (item: ParentSignupRequestItem, action: "approve" | "reject") => {
+		setParentSignupError("");
+		setParentSignupMessage("");
+		setIsProcessingParentSignupId(item.id);
+
+		const linkedStudentId = action === "approve" ? resolveParentLink(item) : undefined;
+		if (action === "approve" && !linkedStudentId) {
+			setParentSignupError(
+				"승인 시 연결할 학생을 선택해 주세요. (신청에 적힌 자녀 이름과 정확히 같은 승인 학생이 한 명이면 자동 선택됩니다.)",
+			);
+			setIsProcessingParentSignupId(null);
+			return;
+		}
+
+		const response = await fetch("/api/admin/parent-signup", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: item.id,
+				action,
+				...(action === "approve" && linkedStudentId ? { linkedStudentId } : {}),
+			}),
+		});
+		const result = (await response.json()) as {
+			message?: string;
+			detail?: string;
+			username?: string;
+			linkedStudentId?: string;
+		};
+
+		if (!response.ok) {
+			const base = result.message ?? "학부모 가입 신청 처리에 실패했습니다.";
+			setParentSignupError(result.detail ? `${base} — ${result.detail}` : base);
+			setIsProcessingParentSignupId(null);
+			return;
+		}
+
+		if (action === "approve") {
+			setParentSignupMessage(`학부모 승인 완료: ${result.username ?? item.username} · 자녀 프로필 연결됨`);
+			setParentLinkChoice((prev) => {
+				const next = { ...prev };
+				delete next[item.id];
+				return next;
+			});
+		} else {
+			setParentSignupMessage("학부모 가입 신청을 거절 처리했습니다.");
+		}
+
+		setIsProcessingParentSignupId(null);
+		await fetchManagementData();
+	};
+
+	const handleDeleteParentSignup = async (id: number) => {
+		if (!window.confirm("이 학부모 가입 신청 내역을 삭제할까요?")) return;
+		setIsDeletingParentSignupId(id);
+		setParentSignupError("");
+		setParentSignupMessage("");
+
+		const response = await fetch("/api/admin/parent-signup", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setParentSignupError(result.message ?? "학부모 가입 신청 삭제에 실패했습니다.");
+			setIsDeletingParentSignupId(null);
+			return;
+		}
+
+		setParentSignupMessage("학부모 가입 신청 내역을 삭제했습니다.");
+		setIsDeletingParentSignupId(null);
+		setParentLinkChoice((prev) => {
+			const next = { ...prev };
+			delete next[id];
+			return next;
+		});
+		await fetchManagementData();
+	};
+
+	const handleResetParentPassword = async (parentId: string) => {
+		setParentAccountsError("");
+		setParentAccountsMessage("");
+		const pw = (parentPasswordDraft[parentId] ?? "").trim();
+		if (pw.length < 6) {
+			setParentAccountsError("비밀번호는 6자 이상이어야 합니다.");
+			return;
+		}
+		setIsSavingParentPasswordId(parentId);
+		const res = await fetch("/api/admin/parent-accounts", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: parentId, password: pw }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setIsSavingParentPasswordId(null);
+		if (!res.ok) {
+			const base = result.message ?? "비밀번호 변경에 실패했습니다.";
+			setParentAccountsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setParentPasswordDraft((prev) => {
+			const next = { ...prev };
+			delete next[parentId];
+			return next;
+		});
+		setParentAccountsMessage("학부모 비밀번호를 변경했습니다.");
+		await fetchManagementData();
+	};
+
+	const handleDeleteParentAccount = async (parentId: string) => {
+		if (
+			!window.confirm(
+				"이 학부모 계정을 삭제할까요? 연결된 학부모 문의(parent_requests)도 함께 삭제됩니다. 자녀 학생 프로필은 삭제되지 않습니다.",
+			)
+		) {
+			return;
+		}
+		setIsDeletingParentAccountId(parentId);
+		setParentAccountsError("");
+		setParentAccountsMessage("");
+		const res = await fetch("/api/admin/parent-accounts", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: parentId }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setIsDeletingParentAccountId(null);
+		if (!res.ok) {
+			const base = result.message ?? "학부모 계정 삭제에 실패했습니다.";
+			setParentAccountsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setParentPasswordDraft((prev) => {
+			const next = { ...prev };
+			delete next[parentId];
+			return next;
+		});
+		setParentAccountsMessage("학부모 계정을 삭제했습니다.");
+		await fetchManagementData();
+	};
+
+	const handleCreateGroup = async (event: FormEvent) => {
+		event.preventDefault();
+		setGroupsError("");
+		setGroupsMessage("");
+		const name = newGroupName.trim();
+		if (!name) {
+			setGroupsError("수업반 이름을 입력해 주세요.");
+			return;
+		}
+		setIsCreatingGroup(true);
+		const res = await fetch("/api/admin/class-groups", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ name, description: newGroupDesc.trim() || null }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setIsCreatingGroup(false);
+		if (!res.ok) {
+			const base = result.message ?? "수업반 생성에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setNewGroupName("");
+		setNewGroupDesc("");
+		setGroupsMessage("수업반이 생성되었습니다.");
+		await fetchManagementData();
+	};
+
+	const handleSaveGroupMeta = async (groupId: number) => {
+		setGroupsError("");
+		setGroupsMessage("");
+		const meta = groupMetaDraft[groupId];
+		if (!meta?.name.trim()) {
+			setGroupsError("수업반 이름은 비울 수 없습니다.");
+			return;
+		}
+		setSavingGroupId(groupId);
+		const res = await fetch("/api/admin/class-groups", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: groupId,
+				name: meta.name.trim(),
+				description: meta.description.trim() || null,
+			}),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setSavingGroupId(null);
+		if (!res.ok) {
+			const base = result.message ?? "저장에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setGroupsMessage("수업반 정보를 저장했습니다.");
+		await fetchManagementData();
+	};
+
+	const handleSaveGroupStudents = async (groupId: number) => {
+		setGroupsError("");
+		setGroupsMessage("");
+		setSavingGroupId(groupId);
+		const res = await fetch("/api/admin/class-groups", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				id: groupId,
+				studentIds: groupStudentDraft[groupId] ?? [],
+			}),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setSavingGroupId(null);
+		if (!res.ok) {
+			const base = result.message ?? "저장에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setGroupsMessage("반 소속 학생을 저장했습니다.");
+		await fetchManagementData();
+	};
+
+	const handleDeleteGroup = async (groupId: number) => {
+		if (!window.confirm("이 수업반과 소속·주간 리포트까지 모두 삭제할까요?")) return;
+		setGroupsError("");
+		setGroupsMessage("");
+		setDeletingGroupId(groupId);
+		const res = await fetch("/api/admin/class-groups", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: groupId }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setDeletingGroupId(null);
+		if (!res.ok) {
+			const base = result.message ?? "삭제에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setGroupsMessage("수업반을 삭제했습니다.");
+		if (reportGroupId === groupId) setReportGroupId(null);
+		await fetchManagementData();
+	};
+
+	const handleCreateReport = async (event: FormEvent) => {
+		event.preventDefault();
+		if (reportGroupId === null) return;
+		setGroupsError("");
+		setGroupsMessage("");
+		const weekLabel = newReportWeek.trim();
+		const content = newReportContent.trim();
+		if (!weekLabel || !content) {
+			setGroupsError("주차 라벨과 수업 내용을 입력해 주세요.");
+			return;
+		}
+		setIsCreatingReport(true);
+		const res = await fetch("/api/admin/class-reports", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ groupId: reportGroupId, weekLabel, content }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setIsCreatingReport(false);
+		if (!res.ok) {
+			const base = result.message ?? "리포트 등록에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		setNewReportWeek("");
+		setNewReportContent("");
+		setGroupsMessage("주간 리포트를 등록했습니다.");
+		const reload = await fetch(`/api/admin/class-reports?groupId=${reportGroupId}`, { cache: "no-store" });
+		const j = (await reload.json()) as { reports?: ClassReportItem[] };
+		if (reload.ok) setClassReports(j.reports ?? []);
+	};
+
+	const handleDeleteReport = async (reportId: number) => {
+		if (!window.confirm("이 리포트를 삭제할까요?")) return;
+		setDeletingReportId(reportId);
+		setGroupsError("");
+		const res = await fetch("/api/admin/class-reports", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: reportId }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setDeletingReportId(null);
+		if (!res.ok) {
+			const base = result.message ?? "삭제에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		if (editingReportId === reportId) {
+			setEditingReportId(null);
+			setEditReportWeek("");
+			setEditReportContent("");
+		}
+		setGroupsMessage("리포트를 삭제했습니다.");
+		if (reportGroupId !== null) {
+			const reload = await fetch(`/api/admin/class-reports?groupId=${reportGroupId}`, { cache: "no-store" });
+			const j = (await reload.json()) as { reports?: ClassReportItem[] };
+			if (reload.ok) setClassReports(j.reports ?? []);
+		}
+	};
+
+	const startEditReport = (r: ClassReportItem) => {
+		setGroupsError("");
+		setEditingReportId(r.id);
+		setEditReportWeek(r.week_label);
+		setEditReportContent(r.content);
+	};
+
+	const cancelEditReport = () => {
+		setEditingReportId(null);
+		setEditReportWeek("");
+		setEditReportContent("");
+	};
+
+	const handleSaveReportEdit = async (reportId: number) => {
+		setGroupsError("");
+		setGroupsMessage("");
+		const weekLabel = editReportWeek.trim();
+		const content = editReportContent.trim();
+		if (!weekLabel || !content) {
+			setGroupsError("주차 라벨과 수업 내용을 입력해 주세요.");
+			return;
+		}
+		setSavingReportId(reportId);
+		const res = await fetch("/api/admin/class-reports", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: reportId, weekLabel, content }),
+		});
+		const result = (await res.json()) as { message?: string; detail?: string };
+		setSavingReportId(null);
+		if (!res.ok) {
+			const base = result.message ?? "리포트 수정에 실패했습니다.";
+			setGroupsError(result.detail ? `${base} — ${result.detail}` : base);
+			return;
+		}
+		cancelEditReport();
+		setGroupsMessage("리포트를 수정했습니다.");
+		if (reportGroupId !== null) {
+			const reload = await fetch(`/api/admin/class-reports?groupId=${reportGroupId}`, { cache: "no-store" });
+			const j = (await reload.json()) as { reports?: ClassReportItem[] };
+			if (reload.ok) setClassReports(j.reports ?? []);
+		}
+	};
+
 	const handleDeleteRequestForAdmin = async (id: number) => {
 		if (!window.confirm("이 요청을 관리자 목록에서 완전히 삭제할까요?")) return;
 		setIsDeletingRequestId(id);
@@ -1306,6 +1873,58 @@ export default function AdminPage() {
 		await fetchManagementData();
 	};
 
+	const handleSaveParentRequest = async (
+		id: number,
+		status: ParentRequestAdminItem["status"],
+		adminReply: string,
+		supportVideoUrl: string,
+	) => {
+		setParentRequestsError("");
+		setParentRequestsMessage("");
+		setIsSavingParentRequestId(id);
+
+		const response = await fetch("/api/admin/parent-requests", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, status, adminReply, supportVideoUrl }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setParentRequestsError(result.message ?? "문의 답변 저장에 실패했습니다.");
+			setIsSavingParentRequestId(null);
+			return;
+		}
+
+		setParentRequestsMessage("문의 처리 내용이 저장되었습니다.");
+		setIsSavingParentRequestId(null);
+		await fetchManagementData();
+	};
+
+	const handleDeleteParentRequestForAdmin = async (id: number) => {
+		if (!window.confirm("이 학부모 문의를 관리자 목록에서 완전히 삭제할까요?")) return;
+		setIsDeletingParentRequestId(id);
+		setParentRequestsError("");
+		setParentRequestsMessage("");
+
+		const response = await fetch("/api/admin/parent-requests", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+
+		if (!response.ok) {
+			setParentRequestsError(result.message ?? "문의 삭제에 실패했습니다.");
+			setIsDeletingParentRequestId(null);
+			return;
+		}
+
+		setParentRequestsMessage("문의를 관리자 목록에서 삭제했습니다.");
+		setIsDeletingParentRequestId(null);
+		await fetchManagementData();
+	};
+
 	return (
 		<main className="min-h-screen bg-zinc-100 px-4 pb-12 pt-6 text-zinc-800 sm:px-6 sm:pt-8">
 			<div className="mx-auto w-full max-w-4xl space-y-5">
@@ -1318,12 +1937,13 @@ export default function AdminPage() {
 						<Link href="/material" className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">자료실로</Link>
 					</div>
 
-					<div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-zinc-200/70 p-1.5 sm:grid-cols-5">
+					<div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-zinc-200/70 p-1.5 sm:grid-cols-3 lg:grid-cols-6">
 						{[
 							{ key: "materials", label: "자료 업로드" },
 							{ key: "videos", label: "영상 업로드" },
 							{ key: "main", label: "메인 설정" },
 							{ key: "members", label: "회원관리" },
+							{ key: "groups", label: "수업반" },
 							{ key: "requests", label: "요청관리" },
 						].map((tab) => (
 							<button
@@ -1852,11 +2472,440 @@ export default function AdminPage() {
 								{signupRequests.length === 0 ? <p className="text-sm text-zinc-500">가입 신청이 없습니다.</p> : null}
 							</div>
 						</div>
+
+						<div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+							<h3 className="text-sm font-semibold text-zinc-900">학부모 가입 신청</h3>
+							<p className="mt-1 text-xs text-zinc-500">
+								승인 시 자녀와 연결할 <span className="font-medium">승인된 학생 프로필</span>을 선택하세요. 비밀번호는 신청 시 입력값을 bcrypt 해시로 저장합니다.
+							</p>
+							{parentSignupError ? (
+								<p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{parentSignupError}</p>
+							) : null}
+							{parentSignupMessage ? (
+								<p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{parentSignupMessage}</p>
+							) : null}
+							<div className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+								{parentSignupRequests.map((item) => {
+									const linkValue = resolveParentLink(item);
+									const approvedStudents = students.filter((s) => s.is_approved);
+									return (
+										<div key={item.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+											<p className="text-sm font-semibold text-zinc-900">
+												학부모 {item.parent_name} · 아이디 <span className="font-mono">{item.username}</span>
+											</p>
+											<p className="mt-1 text-xs text-zinc-600">
+												자녀 이름: {item.student_name} · 학원: {item.academy} · 연락처: {item.phone}
+											</p>
+											<p className="mt-1 text-xs text-zinc-600">
+												비밀번호(신청): <span className="font-mono">{item.password}</span>
+											</p>
+											<p className="mt-1 text-xs text-zinc-500">신청일: {toKoreanDate(item.created_at)}</p>
+											<div className="mt-2">
+												<label className="mb-1 block text-[11px] font-semibold text-zinc-600" htmlFor={`parent-link-${item.id}`}>
+													연결 학생 (profiles)
+												</label>
+												<select
+													id={`parent-link-${item.id}`}
+													value={linkValue}
+													onChange={(e) =>
+														setParentLinkChoice((prev) => ({
+															...prev,
+															[item.id]: e.target.value,
+														}))
+													}
+													disabled={item.status !== "대기"}
+													className="w-full rounded-lg border border-zinc-300 bg-white px-2 py-2 text-xs outline-none transition focus:border-zinc-500 disabled:cursor-not-allowed disabled:bg-zinc-100"
+												>
+													<option value="">— 학생 선택 —</option>
+													{approvedStudents.map((s) => (
+														<option key={s.id} value={s.id}>
+															{s.name} ({s.username}) · {s.academy}
+														</option>
+													))}
+												</select>
+											</div>
+											<div className="mt-2 flex flex-wrap items-center gap-2">
+												<span
+													className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+														item.status === "승인"
+															? "bg-emerald-100 text-emerald-700"
+															: item.status === "거절"
+																? "bg-rose-100 text-rose-700"
+																: "bg-zinc-200 text-zinc-700"
+													}`}
+												>
+													{item.status}
+												</span>
+												<button
+													type="button"
+													onClick={() => void handleApproveParentSignup(item, "approve")}
+													disabled={item.status !== "대기" || isProcessingParentSignupId === item.id}
+													className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isProcessingParentSignupId === item.id ? "처리 중..." : "승인"}
+												</button>
+												<button
+													type="button"
+													onClick={() => void handleApproveParentSignup(item, "reject")}
+													disabled={item.status !== "대기" || isProcessingParentSignupId === item.id}
+													className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													거절
+												</button>
+												<button
+													type="button"
+													onClick={() => void handleDeleteParentSignup(item.id)}
+													disabled={isDeletingParentSignupId === item.id}
+													className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+												>
+													{isDeletingParentSignupId === item.id ? "삭제 중..." : "신청 삭제"}
+												</button>
+											</div>
+										</div>
+									);
+								})}
+								{parentSignupRequests.length === 0 ? <p className="text-sm text-zinc-500">학부모 가입 신청이 없습니다.</p> : null}
+							</div>
+						</div>
+
+						<div className="mt-6 rounded-2xl border border-zinc-200 bg-zinc-50 p-4">
+							<h3 className="text-sm font-semibold text-zinc-900">승인된 학부모 계정</h3>
+							<p className="mt-1 text-xs text-zinc-500">
+								학부모 로그인 계정입니다. 비밀번호는 bcrypt 해시로만 저장되며, 아래에서 새 비밀번호를 넣고 「비밀번호 적용」하면 덮어씁니다. 계정 삭제 시 해당 학부모의
+								문의 내역도 함께 삭제됩니다. 자녀 학생 계정을 삭제하려면 먼저 연결된 학부모 계정을 삭제해야 할 수 있습니다.
+							</p>
+							{parentAccountsError ? (
+								<p className="mt-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{parentAccountsError}</p>
+							) : null}
+							{parentAccountsMessage ? (
+								<p className="mt-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{parentAccountsMessage}</p>
+							) : null}
+							<div className="mt-3 max-h-96 space-y-2 overflow-y-auto">
+								{parentAccounts.map((pa) => (
+									<div key={pa.id} className="rounded-xl border border-zinc-200 bg-white p-3">
+										<p className="text-sm font-semibold text-zinc-900">
+											{pa.name} · 아이디 <span className="font-mono">{pa.username}</span>
+										</p>
+										<p className="mt-1 text-xs text-zinc-600">
+											연결 자녀: {pa.student_name || "—"}
+											{pa.student_username ? ` · ${pa.student_username}` : ""} · 연락처 {pa.phone}
+										</p>
+										<p className="mt-1 text-xs text-zinc-500">
+											등록 {toKoreanDate(pa.created_at)}
+											{pa.is_approved ? "" : " · 미승인"}
+										</p>
+										<div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-end">
+											<div className="min-w-0 flex-1 sm:max-w-xs">
+												<label className="mb-1 block text-[11px] font-semibold text-zinc-600" htmlFor={`parent-pw-${pa.id}`}>
+													새 비밀번호 (6자 이상)
+												</label>
+												<input
+													id={`parent-pw-${pa.id}`}
+													type="password"
+													autoComplete="new-password"
+													value={parentPasswordDraft[pa.id] ?? ""}
+													onChange={(e) =>
+														setParentPasswordDraft((prev) => ({
+															...prev,
+															[pa.id]: e.target.value,
+														}))
+													}
+													placeholder="초기화할 비밀번호"
+													className="w-full rounded-lg border border-zinc-300 px-2 py-2 text-xs outline-none transition focus:border-zinc-500"
+												/>
+											</div>
+											<button
+												type="button"
+												onClick={() => void handleResetParentPassword(pa.id)}
+												disabled={isSavingParentPasswordId === pa.id || isDeletingParentAccountId === pa.id}
+												className="inline-flex min-h-9 shrink-0 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												{isSavingParentPasswordId === pa.id ? "저장 중..." : "비밀번호 적용"}
+											</button>
+											<button
+												type="button"
+												onClick={() => void handleDeleteParentAccount(pa.id)}
+												disabled={isDeletingParentAccountId === pa.id || isSavingParentPasswordId === pa.id}
+												className="inline-flex min-h-9 shrink-0 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+											>
+												<Trash2 className="h-3.5 w-3.5" />
+												{isDeletingParentAccountId === pa.id ? "삭제 중..." : "계정 삭제"}
+											</button>
+										</div>
+									</div>
+								))}
+								{parentAccounts.length === 0 ? <p className="text-sm text-zinc-500">등록된 학부모 계정이 없습니다.</p> : null}
+							</div>
+						</div>
 					</section>
 				) : null}
 
-				{activeTab === "requests" ? (
-					<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+				{activeTab === "groups" ? (
+					<section className="space-y-5">
+						<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+							<div className="flex items-center gap-2">
+								<Users className="h-5 w-5 text-zinc-700" />
+								<h2 className="text-lg font-semibold text-zinc-900">수업반 · 학생 배정</h2>
+							</div>
+							<p className="mt-1 text-xs text-zinc-500">
+								반을 만들고 학생을 체크한 뒤 「반 학생 저장」을 누르세요. 반 삭제 시 소속·주간 리포트도 함께 삭제됩니다.
+							</p>
+							{groupsError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{groupsError}</p> : null}
+							{groupsMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{groupsMessage}</p> : null}
+
+							<form className="mt-4 grid gap-2 sm:grid-cols-2" onSubmit={handleCreateGroup}>
+								<input
+									type="text"
+									value={newGroupName}
+									onChange={(e) => setNewGroupName(e.target.value)}
+									placeholder="새 수업반 이름"
+									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500"
+								/>
+								<input
+									type="text"
+									value={newGroupDesc}
+									onChange={(e) => setNewGroupDesc(e.target.value)}
+									placeholder="설명 (선택)"
+									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none transition focus:border-zinc-500 sm:col-span-2"
+								/>
+								<button
+									type="submit"
+									disabled={isCreatingGroup}
+									className="inline-flex min-h-10 items-center justify-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-45 sm:col-span-2"
+								>
+									{isCreatingGroup ? "추가 중..." : "수업반 추가"}
+								</button>
+							</form>
+
+							<div className="mt-5 max-h-[28rem] space-y-3 overflow-y-auto">
+								{classGroups.map((g) => {
+									const meta = groupMetaDraft[g.id] ?? { name: g.name, description: g.description ?? "" };
+									const selected = new Set(groupStudentDraft[g.id] ?? []);
+									return (
+										<div key={g.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-4">
+											<div className="grid gap-2 sm:grid-cols-2">
+												<input
+													type="text"
+													value={meta.name}
+													onChange={(e) =>
+														setGroupMetaDraft((prev) => ({
+															...prev,
+															[g.id]: { ...meta, name: e.target.value },
+														}))
+													}
+													className="w-full rounded-lg border border-zinc-300 px-2 py-2 text-sm outline-none focus:border-zinc-500"
+												/>
+												<div className="flex flex-wrap gap-2">
+													<button
+														type="button"
+														onClick={() => void handleSaveGroupMeta(g.id)}
+														disabled={savingGroupId === g.id}
+														className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-800 transition hover:bg-zinc-100 disabled:opacity-50"
+													>
+														{savingGroupId === g.id ? "저장 중..." : "이름·설명 저장"}
+													</button>
+													<button
+														type="button"
+														onClick={() => void handleDeleteGroup(g.id)}
+														disabled={deletingGroupId === g.id}
+														className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:opacity-50"
+													>
+														<Trash2 className="h-3.5 w-3.5" />
+														{deletingGroupId === g.id ? "삭제 중..." : "반 삭제"}
+													</button>
+												</div>
+												<textarea
+													value={meta.description}
+													onChange={(e) =>
+														setGroupMetaDraft((prev) => ({
+															...prev,
+															[g.id]: { ...meta, description: e.target.value },
+														}))
+													}
+													placeholder="반 설명·특징 (학부모에게 보일 수 있음)"
+													rows={2}
+													className="w-full rounded-lg border border-zinc-300 px-2 py-2 text-sm outline-none focus:border-zinc-500 sm:col-span-2"
+												/>
+											</div>
+											<p className="mt-3 text-[11px] font-semibold text-zinc-600">소속 학생</p>
+											<div className="mt-1 max-h-40 space-y-1 overflow-y-auto rounded-lg border border-zinc-200 bg-white p-2">
+												{students.length === 0 ? (
+													<p className="text-xs text-zinc-500">학생 목록을 불러오지 못했습니다.</p>
+												) : (
+													students.map((s) => (
+														<label key={s.id} className="flex cursor-pointer items-center gap-2 text-xs text-zinc-800">
+															<input
+																type="checkbox"
+																checked={selected.has(s.id)}
+																onChange={() => {
+																	setGroupStudentDraft((prev) => {
+																		const cur = prev[g.id] ?? [];
+																		const has = cur.includes(s.id);
+																		const next = has ? cur.filter((x) => x !== s.id) : [...cur, s.id];
+																		return { ...prev, [g.id]: next };
+																	});
+																}}
+																className="accent-brand"
+															/>
+															<span>
+																{s.name} ({s.username}) · {s.academy}
+																{s.is_approved ? "" : " · 미승인"}
+															</span>
+														</label>
+													))
+												)}
+											</div>
+											<button
+												type="button"
+												onClick={() => void handleSaveGroupStudents(g.id)}
+												disabled={savingGroupId === g.id}
+												className="mt-2 inline-flex min-h-9 items-center rounded-lg bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand-hover disabled:opacity-50"
+											>
+												{savingGroupId === g.id ? "저장 중..." : "반 학생 저장"}
+											</button>
+										</div>
+									);
+								})}
+								{classGroups.length === 0 ? <p className="text-sm text-zinc-500">등록된 수업반이 없습니다.</p> : null}
+							</div>
+						</div>
+
+						<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+							<h2 className="text-lg font-semibold text-zinc-900">주간 수업 리포트</h2>
+							<p className="mt-1 text-xs text-zinc-500">반을 고른 뒤 주차 라벨(예: 2026년 4월 4주)과 수업 내용·특징을 입력합니다.</p>
+							<div className="mt-3">
+								<label className="mb-1 block text-xs font-semibold text-zinc-600" htmlFor="report-group-select">
+									대상 수업반
+								</label>
+								<select
+									id="report-group-select"
+									value={reportGroupId ?? ""}
+									onChange={(e) => setReportGroupId(e.target.value ? Number(e.target.value) : null)}
+									className="w-full max-w-md rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-zinc-500"
+								>
+									{classGroups.length === 0 ? <option value="">수업반을 먼저 만드세요</option> : null}
+									{classGroups.map((g) => (
+										<option key={g.id} value={g.id}>
+											{g.name}
+										</option>
+									))}
+								</select>
+							</div>
+
+							<form className="mt-4 space-y-2" onSubmit={handleCreateReport}>
+								<input
+									type="text"
+									value={newReportWeek}
+									onChange={(e) => setNewReportWeek(e.target.value)}
+									placeholder="주차 라벨 (예: 4월 4주차)"
+									disabled={reportGroupId === null}
+									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-zinc-500 disabled:bg-zinc-100"
+								/>
+								<textarea
+									value={newReportContent}
+									onChange={(e) => setNewReportContent(e.target.value)}
+									placeholder="이번 주 수업 전반 내용·특징"
+									rows={4}
+									disabled={reportGroupId === null}
+									className="w-full rounded-xl border border-zinc-300 px-3 py-2.5 text-sm outline-none focus:border-zinc-500 disabled:bg-zinc-100"
+								/>
+								<button
+									type="submit"
+									disabled={reportGroupId === null || isCreatingReport}
+									className="inline-flex min-h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-white transition hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-45"
+								>
+									{isCreatingReport ? "등록 중..." : "리포트 등록"}
+								</button>
+							</form>
+
+							<div className="mt-5 space-y-3">
+								{reportsLoading ? <p className="text-sm text-zinc-500">리포트 불러오는 중…</p> : null}
+								{!reportsLoading &&
+									classReports.map((r) => (
+										<div key={r.id} className="rounded-xl border border-zinc-200 bg-zinc-50 p-3">
+											{editingReportId === r.id ? (
+												<div className="space-y-2">
+													<input
+														type="text"
+														value={editReportWeek}
+														onChange={(e) => setEditReportWeek(e.target.value)}
+														placeholder="주차 라벨"
+														className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+													/>
+													<textarea
+														value={editReportContent}
+														onChange={(e) => setEditReportContent(e.target.value)}
+														placeholder="수업 내용·특징"
+														rows={4}
+														className="w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none focus:border-zinc-500"
+													/>
+													<div className="flex flex-wrap gap-2">
+														<button
+															type="button"
+															onClick={() => void handleSaveReportEdit(r.id)}
+															disabled={savingReportId === r.id}
+															className="inline-flex min-h-8 items-center rounded-lg bg-brand px-3 text-xs font-semibold text-white transition hover:bg-brand-hover disabled:opacity-50"
+														>
+															{savingReportId === r.id ? "저장 중..." : "저장"}
+														</button>
+														<button
+															type="button"
+															onClick={cancelEditReport}
+															disabled={savingReportId === r.id}
+															className="inline-flex min-h-8 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+														>
+															취소
+														</button>
+													</div>
+												</div>
+											) : (
+												<>
+													<div className="flex flex-wrap items-start justify-between gap-2">
+														<div>
+															<p className="text-sm font-semibold text-zinc-900">{r.week_label}</p>
+															<p className="mt-1 text-xs text-zinc-500">{toKoreanDate(r.created_at)}</p>
+														</div>
+														<div className="flex flex-wrap gap-1.5">
+															<button
+																type="button"
+																onClick={() => startEditReport(r)}
+																disabled={
+																	savingReportId !== null ||
+																	deletingReportId === r.id ||
+																	(editingReportId !== null && editingReportId !== r.id)
+																}
+																className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-zinc-300 bg-white px-2 text-xs font-semibold text-zinc-700 hover:bg-zinc-100 disabled:opacity-50"
+															>
+																<Pencil className="h-3 w-3.5" />
+																수정
+															</button>
+															<button
+																type="button"
+																onClick={() => void handleDeleteReport(r.id)}
+																disabled={deletingReportId === r.id || savingReportId === r.id || editingReportId === r.id}
+																className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-rose-300 bg-white px-2 text-xs font-semibold text-rose-700 hover:bg-rose-50 disabled:opacity-50"
+															>
+																<Trash2 className="h-3 w-3.5" />
+																{deletingReportId === r.id ? "삭제 중..." : "삭제"}
+															</button>
+														</div>
+													</div>
+													<p className="mt-2 whitespace-pre-wrap text-sm text-zinc-800">{r.content}</p>
+												</>
+											)}
+										</div>
+									))}
+								{!reportsLoading && reportGroupId !== null && classReports.length === 0 ? (
+									<p className="text-sm text-zinc-500">등록된 리포트가 없습니다.</p>
+								) : null}
+							</div>
+						</div>
+					</section>
+				) : null}
+
+			{activeTab === "requests" ? (
+				<section className="space-y-5">
+					<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
 						<div className="flex items-center gap-2">
 							<MessageSquareText className="h-5 w-5 text-zinc-700" />
 							<h2 className="text-lg font-semibold text-zinc-900">학생 요청관리</h2>
@@ -1877,8 +2926,33 @@ export default function AdminPage() {
 							))}
 							{studentRequests.length === 0 ? <p className="text-sm text-zinc-500">접수된 요청이 없습니다.</p> : null}
 						</div>
-					</section>
-				) : null}
+					</div>
+
+					<div className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+						<div className="flex items-center gap-2">
+							<MessageSquareText className="h-5 w-5 text-zinc-700" />
+							<h2 className="text-lg font-semibold text-zinc-900">학부모 문의관리</h2>
+						</div>
+						<p className="mt-1 text-xs text-zinc-500">학부모가 제출한 보강영상·질문·상담 문의입니다. 답변 작성 후 「처리 내용 저장」을 누르세요.</p>
+						{parentRequestsError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{parentRequestsError}</p> : null}
+						{parentRequestsMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{parentRequestsMessage}</p> : null}
+
+						<div className="mt-4 space-y-3">
+							{parentRequests.map((item) => (
+								<ParentRequestEditor
+									key={`${item.id}-${item.status}-${item.admin_reply ?? ""}-${item.support_video_url ?? ""}`}
+									item={item}
+									onSave={handleSaveParentRequest}
+									onDelete={handleDeleteParentRequestForAdmin}
+									isDeleting={isDeletingParentRequestId === item.id}
+									isSaving={isSavingParentRequestId === item.id}
+								/>
+							))}
+							{parentRequests.length === 0 ? <p className="text-sm text-zinc-500">접수된 학부모 문의가 없습니다.</p> : null}
+						</div>
+					</div>
+				</section>
+			) : null}
 
 				{studentDetailModal !== null ? (
 					<div
@@ -2290,6 +3364,81 @@ function RequestEditor({ item, onSave, onDelete, isSaving, isDeleting }: Request
 					className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
 				>
 					{isDeleting ? "삭제 중..." : "요청 완전 삭제"}
+				</button>
+			</div>
+		</div>
+	);
+}
+
+type ParentRequestEditorProps = {
+	item: ParentRequestAdminItem;
+	onSave: (id: number, status: ParentRequestAdminItem["status"], adminReply: string, supportVideoUrl: string) => Promise<void>;
+	onDelete: (id: number) => Promise<void>;
+	isSaving: boolean;
+	isDeleting: boolean;
+};
+
+function ParentRequestEditor({ item, onSave, onDelete, isSaving, isDeleting }: ParentRequestEditorProps) {
+	const [status, setStatus] = useState<ParentRequestAdminItem["status"]>(item.status);
+	const [adminReply, setAdminReply] = useState(item.admin_reply || "");
+	const [supportVideoUrl, setSupportVideoUrl] = useState(item.support_video_url || "");
+
+	return (
+		<div className="rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+			<p className="text-xs text-zinc-500">
+				{item.request_type} · 학부모 {item.parent_name}({item.parent_username}) · {toKoreanDate(item.created_at)}
+			</p>
+			{item.is_deleted ? (
+				<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+					학부모 화면에서 삭제됨
+				</p>
+			) : null}
+			<h3 className="mt-1 text-sm font-semibold text-zinc-900">{item.title}</h3>
+			<p className="mt-1 text-sm text-zinc-700">{item.content}</p>
+
+			<div className="mt-3 grid gap-2 sm:grid-cols-2">
+				<select
+					value={status}
+					onChange={(e) => setStatus(e.target.value as ParentRequestAdminItem["status"])}
+					className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+				>
+					<option value="접수">접수</option>
+					<option value="처리중">처리중</option>
+					<option value="완료">완료</option>
+				</select>
+				<input
+					type="url"
+					value={supportVideoUrl}
+					onChange={(e) => setSupportVideoUrl(e.target.value)}
+					placeholder="보강 영상 링크 (선택)"
+					className="rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+				/>
+			</div>
+
+			<textarea
+				rows={3}
+				value={adminReply}
+				onChange={(e) => setAdminReply(e.target.value)}
+				placeholder="학부모에게 보낼 답변"
+				className="mt-2 w-full rounded-xl border border-zinc-300 bg-white px-3 py-2 text-sm outline-none transition focus:border-zinc-500"
+			/>
+
+			<div className="mt-2 flex items-center gap-2">
+				<button
+					type="button"
+					onClick={() => onSave(item.id, status, adminReply, supportVideoUrl)}
+					disabled={isSaving}
+					className="inline-flex min-h-9 items-center rounded-lg border border-zinc-300 bg-white px-3 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{isSaving ? "저장 중..." : "처리 내용 저장"}
+				</button>
+				<button
+					type="button"
+					onClick={() => onDelete(item.id)}
+					disabled={isDeleting}
+					className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+				>
+					{isDeleting ? "삭제 중..." : "문의 완전 삭제"}
 				</button>
 			</div>
 		</div>

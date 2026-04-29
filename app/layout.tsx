@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "이정관T의 국어 생활",
+  title: "이정관의 국어 생활",
   description: "국어 1등급을 위한 자료 제공",
 };
 

@@ -277,7 +277,7 @@ export default function RequestPage() {
 										) : null}
 										{item.admin_reply ? (
 											<p className="mt-2 rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm text-zinc-700">
-												이정관T: {item.admin_reply}
+												이정관: {item.admin_reply}
 											</p>
 										) : null}
 										{item.support_video_url ? (

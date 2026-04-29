@@ -29,7 +29,7 @@ export default function LoginPage() {
 
 		if (response.ok) {
 			setIsSubmitting(false);
-			router.replace("/");
+			router.replace("/student");
 			return;
 		}
 
@@ -104,6 +104,18 @@ export default function LoginPage() {
 						className="text-sm font-semibold text-brand transition hover:text-brand-hover hover:underline underline-offset-4"
 					>
 						회원가입
+					</Link>
+					<Link
+						href="/parent-login"
+						className="text-sm font-semibold text-slate-600 transition hover:text-brand hover:underline underline-offset-4"
+					>
+						학부모 로그인
+					</Link>
+					<Link
+						href="/auth/parent-signup"
+						className="text-xs font-medium text-slate-500 transition hover:text-slate-700"
+					>
+						학부모 회원가입
 					</Link>
 					<Link href="/admin-login" className="text-xs font-medium text-slate-400 transition hover:text-slate-600">
 						관리자 로그인

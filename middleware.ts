@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isValidUuid } from "@/utils/uuidValidation";
+import { PARENT_AUTH_COOKIE_NAME, PARENT_ID_COOKIE_NAME } from "@/utils/server/parentAuthConstants";
+
+/**
+ * 이 미들웨어는 `config.matcher`에 있는 경로에만 적용됩니다.
+ * 로그인·가입 화면(/login, /parent-login, /auth/signup, /auth/parent-signup 등)은 matcher에 넣지 않아 누구나 접근 가능합니다.
+ * API 라우트는 기본적으로 여기서 막지 않습니다.
+ */
 
 const STUDENT_AUTH_COOKIE_NAME = "student_auth";
 const ADMIN_AUTH_COOKIE_NAME = "admin_auth";
+
+function isParentAppPath(pathname: string): boolean {
+	return pathname === "/parent" || pathname.startsWith("/parent/");
+}
 
 export function middleware(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
@@ -9,12 +21,28 @@ export function middleware(request: NextRequest) {
 	const isStudentAuthenticated = Boolean(studentCookie && studentCookie.length > 0);
 	const isAdminAuthenticated = request.cookies.get(ADMIN_AUTH_COOKIE_NAME)?.value === "true";
 
+	// 공개 랜딩(루트는 `/welcome`으로 리다이렉트하는 정적 페이지)
+	if (pathname === "/") {
+		return NextResponse.next();
+	}
+
 	if (pathname.startsWith("/admin")) {
 		if (!isAdminAuthenticated) {
 			const adminLoginUrl = new URL("/admin-login", request.url);
 			return NextResponse.redirect(adminLoginUrl);
 		}
 
+		return NextResponse.next();
+	}
+
+	// 학부모 전용 페이지: /parent, /parent/... (/parent-login 은 경로가 달라 여기에 걸리지 않음)
+	if (isParentAppPath(pathname)) {
+		const parentAuth = request.cookies.get(PARENT_AUTH_COOKIE_NAME)?.value === "true";
+		const parentId = request.cookies.get(PARENT_ID_COOKIE_NAME)?.value?.trim() ?? "";
+		if (!parentAuth || !isValidUuid(parentId)) {
+			const parentLoginUrl = new URL("/parent-login", request.url);
+			return NextResponse.redirect(parentLoginUrl);
+		}
 		return NextResponse.next();
 	}
 
@@ -29,5 +57,17 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-	matcher: ["/", "/video/:path*", "/material/:path*", "/request/:path*", "/admin/:path*"],
+	matcher: [
+		"/",
+		"/student",
+		"/student/:path*",
+		"/video/:path*",
+		"/material/:path*",
+		"/request/:path*",
+		"/mypage",
+		"/mypage/:path*",
+		"/parent",
+		"/parent/:path*",
+		"/admin/:path*",
+	],
 };

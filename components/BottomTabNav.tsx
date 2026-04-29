@@ -5,7 +5,7 @@ import { FileText, Home, MessageSquareText, PlayCircle, UserRound } from "lucide
 import { STUDENT_APP_SHELL } from "@/lib/appShell";
 
 const TABS = [
-	{ id: "home" as const, label: "홈", href: "/", Icon: Home },
+	{ id: "home" as const, label: "홈", href: "/student", Icon: Home },
 	{ id: "video" as const, label: "영상", href: "/video", Icon: PlayCircle },
 	{ id: "material" as const, label: "자료", href: "/material", Icon: FileText },
 	{ id: "request" as const, label: "요청", href: "/request", Icon: MessageSquareText },
