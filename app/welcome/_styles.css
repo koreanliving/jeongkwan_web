@@ -30,7 +30,7 @@
 
 .animate-marquee {
 	display: flex;
-	animation: welcome-marquee 28s linear infinite;
+	animation: welcome-marquee 20s linear infinite;
 	will-change: transform;
 }
 
