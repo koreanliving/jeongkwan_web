@@ -311,15 +311,25 @@ function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; sum
 				role="status"
 				aria-live="polite"
 			>
-				<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
-					<div className="mb-2.5 flex items-center gap-2">
-						<span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
-							해설
-						</span>
-						{activeIndex !== null ? (
-							<span className="text-[10px] font-bold text-zinc-500">문장 {activeIndex + 1}</span>
-						) : null}
-					</div>
+		<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
+				<div className="mb-2.5 flex items-center gap-2">
+					<span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
+						해설
+					</span>
+					{activeIndex !== null ? (
+						<span className="text-[10px] font-bold text-zinc-500">문장 {activeIndex + 1}</span>
+					) : null}
+					<button
+						type="button"
+						aria-label="해설 닫기"
+						onClick={() => { setPinnedIndex(null); setHoverIndex(null); }}
+						className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+					>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
+							<path d="M3.22 3.22a.75.75 0 011.06 0L8 6.94l3.72-3.72a.75.75 0 111.06 1.06L9.06 8l3.72 3.72a.75.75 0 11-1.06 1.06L8 9.06l-3.72 3.72a.75.75 0 01-1.06-1.06L6.94 8 3.22 4.28a.75.75 0 010-1.06z" />
+						</svg>
+					</button>
+				</div>
 					<p className="whitespace-pre-wrap text-sm font-medium leading-7 tracking-tight text-white sm:text-base sm:leading-8">
 						{activeExplanation}
 					</p>
