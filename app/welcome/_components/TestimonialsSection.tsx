@@ -1,13 +1,12 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Reveal } from "./Reveal";
 
 type Item = {
 	label: string;
 	sub: string;
 	quote: string;
-	/** 있으면 max-md에서만 사용(모바일 전용 줄바꿈) */
 	quoteMobile?: string;
 	meta: string;
 };
@@ -50,90 +49,154 @@ const items: Item[] = [
 const doubled = [...items, ...items];
 
 /** _styles.css 의 welcome-marquee duration 과 반드시 일치 */
-const MARQUEE_DURATION_S = 13.33;
+const DESKTOP_DURATION_S = 13.33;
 
-function itemButtonClass(isActive: boolean) {
+function itemBtnCls(isActive: boolean) {
 	return `flex shrink-0 cursor-default items-baseline gap-2 border-r border-black/[0.08] px-8 transition-colors sm:px-12 ${
 		isActive ? "text-[#0a0a0a]" : "text-neutral-400 hover:text-[#0a0a0a]"
 	}`;
 }
 
+function ItemContent({ item, isActive }: { item: Item; isActive: boolean }) {
+	return (
+		<>
+			<span className="welcome-serif whitespace-nowrap text-[1.05rem] font-semibold tracking-tight text-[#0a0a0a] sm:text-[1.2rem]">
+				{item.label}
+			</span>
+			<span
+				className={`whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.22em] ${
+					isActive ? "text-[#0a0a0a]" : "text-neutral-400"
+				}`}
+			>
+				{item.sub}
+			</span>
+		</>
+	);
+}
+
 export function TestimonialsSection() {
 	const [active, setActive] = useState<Item>(items[0]);
-	const marqueeRef = useRef<HTMLDivElement>(null);
-	const touchStartXRef = useRef(0);
-	const capturedDelayRef = useRef(0);
-	const isHoveredRef = useRef(false);
 
-	/**
-	 * 현재 애니메이션 위치를 animation-delay 로 고정 후 일시정지.
-	 * DOMMatrix 로 실제 translateX 를 읽어 delay 값을 계산합니다.
-	 */
-	const pauseAtCurrentPos = useCallback(() => {
-		const el = marqueeRef.current;
-		if (!el) return;
-		const matrix = new DOMMatrix(getComputedStyle(el).transform);
-		const currentX = matrix.m41; // px
-		const halfWidth = el.scrollWidth / 2;
-		if (halfWidth > 0) {
-			// progress: 0 (start) → 1 (end = same visual as start)
-			const progress = ((-currentX % halfWidth) + halfWidth) % halfWidth / halfWidth;
-			el.style.animationDelay = `${-progress * MARQUEE_DURATION_S}s`;
-		}
-		el.style.animationPlayState = "paused";
+	/* ── 데스크톱: CSS 애니메이션 + JS hover pause/resume ── */
+	const desktopInnerRef = useRef<HTMLDivElement>(null);
+
+	const pauseDesktop = () => {
+		const el = desktopInnerRef.current;
+		if (el) el.style.animationPlayState = "paused";
+	};
+	const resumeDesktop = () => {
+		const el = desktopInnerRef.current;
+		if (el) el.style.animationPlayState = "running";
+	};
+
+	/* ── 모바일: JS RAF 애니메이션 + 터치 관성 ── */
+	const mobileInnerRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const inner = mobileInnerRef.current;
+		if (!inner) return;
+		// 모바일(< 768px)에서만 실행
+		if (window.matchMedia("(min-width: 768px)").matches) return;
+
+		let raf = 0;
+		let pos = 0; // translateX (px, 항상 음수)
+		let halfWidth = 1; // items 한 세트 너비 (doubled 의 절반)
+		let speed = 0; // px/ms — 마운트 후 계산
+		let lastT = 0;
+
+		let isTouching = false;
+		let vel = 0; // px/ms (양수=오른쪽, 음수=왼쪽)
+		let touchX0 = 0;
+		let pos0 = 0;
+		let prevX = 0;
+		let prevT = 0;
+
+		/** pos 를 [-halfWidth, 0) 로 래핑하여 DOM 에 적용 */
+		const render = (p: number) => {
+			let n = p % halfWidth;
+			// JS % 는 부호 유지 → 양수면 반 바퀴 뒤로
+			if (n > 0) n -= halfWidth;
+			if (n < -halfWidth) n += halfWidth;
+			pos = n;
+			inner.style.transform = `translateX(${n}px)`;
+		};
+
+		/** 자동 스크롤 루프 */
+		const autoTick = (t: number) => {
+			if (isTouching) return;
+			const dt = lastT ? t - lastT : 0;
+			lastT = t;
+			render(pos - speed * dt);
+			raf = requestAnimationFrame(autoTick);
+		};
+
+		/** 관성(momentum) 루프 — 감속 후 자동 스크롤로 전환 */
+		const momentumTick = (t: number) => {
+			if (isTouching) return;
+			const dt = lastT ? t - lastT : 16;
+			lastT = t;
+			if (Math.abs(vel) < 0.08) {
+				// 관성 소진 → 자동 스크롤 재개
+				lastT = 0;
+				raf = requestAnimationFrame(autoTick);
+				return;
+			}
+			render(pos + vel * dt);
+			vel *= Math.pow(0.93, dt / 16); // 감속 계수
+			raf = requestAnimationFrame(momentumTick);
+		};
+
+		const onTouchStart = (e: TouchEvent) => {
+			isTouching = true;
+			cancelAnimationFrame(raf);
+			const x = e.touches[0].clientX;
+			touchX0 = x;
+			pos0 = pos;
+			prevX = x;
+			prevT = performance.now();
+			vel = 0;
+		};
+
+		const onTouchMove = (e: TouchEvent) => {
+			const x = e.touches[0].clientX;
+			const t = performance.now();
+			const dt = t - prevT;
+			if (dt > 0) vel = (x - prevX) / dt; // 순간 속도 추적
+			prevX = x;
+			prevT = t;
+			render(pos0 + (x - touchX0)); // 손가락과 1:1 이동
+		};
+
+		const onTouchEnd = () => {
+			isTouching = false;
+			lastT = 0;
+			if (Math.abs(vel) > 0.08) {
+				raf = requestAnimationFrame(momentumTick);
+			} else {
+				raf = requestAnimationFrame(autoTick);
+			}
+		};
+
+		// 레이아웃 완료 후 초기화
+		const initFrame = requestAnimationFrame(() => {
+			halfWidth = inner.scrollWidth / 2;
+			// 데스크톱 CSS 속도와 일치시킴
+			speed = halfWidth / (DESKTOP_DURATION_S * 1000);
+			raf = requestAnimationFrame(autoTick);
+		});
+
+		inner.addEventListener("touchstart", onTouchStart, { passive: true });
+		inner.addEventListener("touchmove", onTouchMove, { passive: true });
+		inner.addEventListener("touchend", onTouchEnd, { passive: true });
+
+		return () => {
+			cancelAnimationFrame(initFrame);
+			cancelAnimationFrame(raf);
+			inner.removeEventListener("touchstart", onTouchStart);
+			inner.removeEventListener("touchmove", onTouchMove);
+			inner.removeEventListener("touchend", onTouchEnd);
+		};
 	}, []);
-
-	const resumeFromCurrentDelay = useCallback(() => {
-		const el = marqueeRef.current;
-		if (!el) return;
-		el.style.animationPlayState = "running";
-	}, []);
-
-	/* ── 마우스 호버 (데스크톱) ── */
-	const handleMouseEnter = useCallback(() => {
-		isHoveredRef.current = true;
-		pauseAtCurrentPos();
-	}, [pauseAtCurrentPos]);
-
-	const handleMouseLeave = useCallback(() => {
-		isHoveredRef.current = false;
-		resumeFromCurrentDelay();
-	}, [resumeFromCurrentDelay]);
-
-	/* ── 터치 스와이프 (모바일 + 태블릿) ── */
-	const handleTouchStart = useCallback(
-		(e: React.TouchEvent) => {
-			pauseAtCurrentPos();
-			capturedDelayRef.current = parseFloat(marqueeRef.current?.style.animationDelay ?? "0");
-			touchStartXRef.current = e.touches[0].clientX;
-		},
-		[pauseAtCurrentPos],
-	);
-
-	const handleTouchMove = useCallback((e: React.TouchEvent) => {
-		const el = marqueeRef.current;
-		if (!el) return;
-		const deltaX = e.touches[0].clientX - touchStartXRef.current;
-		const halfWidth = el.scrollWidth / 2;
-		if (halfWidth === 0) return;
-
-		// 오른쪽 스와이프 → 뒤로(delay 증가), 왼쪽 스와이프 → 앞으로(delay 감소)
-		const timeOffset = (deltaX / halfWidth) * MARQUEE_DURATION_S;
-		let newDelay = capturedDelayRef.current + timeOffset;
-
-		// [-MARQUEE_DURATION_S, 0] 범위로 래핑
-		while (newDelay > 0) newDelay -= MARQUEE_DURATION_S;
-		while (newDelay < -MARQUEE_DURATION_S) newDelay += MARQUEE_DURATION_S;
-
-		el.style.animationDelay = `${newDelay}s`;
-	}, []);
-
-	const handleTouchEnd = useCallback(() => {
-		// 마우스 호버 상태면 재생하지 않음(touch+hover 혼용 기기 대비)
-		if (!isHoveredRef.current) {
-			resumeFromCurrentDelay();
-		}
-	}, [resumeFromCurrentDelay]);
 
 	return (
 		<section className="bg-[#F8F7F2] py-14 text-[#0a0a0a] sm:py-[4.5rem] lg:py-20">
@@ -167,18 +230,14 @@ export function TestimonialsSection() {
 				</div>
 			</div>
 
-			{/* 통합 마퀴 — 모바일·데스크톱 모두 CSS 자동 스크롤 */}
-			{/* 모바일: 터치로 scrub, 손 떼면 재생 재개 / 데스크톱: hover 정지 */}
 			<Reveal delayMs={180} className="mt-16 sm:mt-20 lg:mt-24">
+				{/* ── 데스크톱: CSS 마퀴 ── */}
 				<div
-					className="marquee-track border-y border-black/[0.06] py-6 overflow-hidden"
-					onMouseEnter={handleMouseEnter}
-					onMouseLeave={handleMouseLeave}
-					onTouchStart={handleTouchStart}
-					onTouchMove={handleTouchMove}
-					onTouchEnd={handleTouchEnd}
+					className="hidden overflow-hidden border-y border-black/[0.06] py-6 md:block"
+					onMouseEnter={pauseDesktop}
+					onMouseLeave={resumeDesktop}
 				>
-					<div ref={marqueeRef} className="animate-marquee gap-0">
+					<div ref={desktopInnerRef} className="animate-marquee gap-0">
 						{doubled.map((item, i) => {
 							const isReal = i < items.length;
 							const isActive = active.label === item.label;
@@ -190,18 +249,35 @@ export function TestimonialsSection() {
 									tabIndex={isReal ? 0 : -1}
 									onMouseEnter={() => isReal && setActive(item)}
 									onClick={() => isReal && setActive(item)}
-									className={itemButtonClass(isActive)}
+									className={itemBtnCls(isActive)}
 								>
-									<span className="welcome-serif whitespace-nowrap text-[1.05rem] font-semibold tracking-tight text-[#0a0a0a] sm:text-[1.2rem]">
-										{item.label}
-									</span>
-									<span
-										className={`whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.22em] ${
-											isActive ? "text-[#0a0a0a]" : "text-neutral-400"
-										}`}
-									>
-										{item.sub}
-									</span>
+									<ItemContent item={item} isActive={isActive} />
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* ── 모바일: JS RAF 마퀴 ── */}
+				<div className="overflow-hidden border-y border-black/[0.06] py-6 md:hidden">
+					<div
+						ref={mobileInnerRef}
+						className="flex w-max gap-0"
+						style={{ willChange: "transform" }}
+					>
+						{doubled.map((item, i) => {
+							const isReal = i < items.length;
+							const isActive = active.label === item.label;
+							return (
+								<button
+									key={`m${i}`}
+									type="button"
+									aria-hidden={!isReal}
+									tabIndex={isReal ? 0 : -1}
+									onClick={() => isReal && setActive(item)}
+									className={itemBtnCls(isActive)}
+								>
+									<ItemContent item={item} isActive={isActive} />
 								</button>
 							);
 						})}
