@@ -34,9 +34,6 @@
 	will-change: transform;
 }
 
-.marquee-track:hover .animate-marquee {
-	animation-play-state: paused;
-}
 
 @media (prefers-reduced-motion: reduce) {
 	.welcome-reveal {
