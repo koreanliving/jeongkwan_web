@@ -1,12 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Reveal } from "./Reveal";
 
 type Item = {
 	label: string;
 	sub: string;
 	quote: string;
+	/** 있으면 max-md에서만 사용(모바일 전용 줄바꿈) */
+	quoteMobile?: string;
 	meta: string;
 };
 
@@ -21,6 +23,8 @@ const items: Item[] = [
 		label: "국포자 회생기",
 		sub: "고2 학부모",
 		quote: "국어는 해도 안 된다던 아이가, 이정관쌤 수업을 듣고 \n'하면 될 것 같다'는 마음이 생겼습니다. 모의고사 성적도 \n올랐고, 우리 아이의 변화를 이끌어주셔서 감사합니다.",
+		quoteMobile:
+			"국어는 해도 안 된다던 아이가, 이정관쌤 수업을 듣고 '하면 될 것 같다'는 마음이 생겼습니다.\n모의고사 성적도 올랐고, 우리 아이의 변화를 이끌어주셔서 감사합니다.",
 		meta: "고2 학부모 · 온라인 수업",
 	},
 	{
@@ -44,10 +48,53 @@ const items: Item[] = [
 ];
 
 const doubled = [...items, ...items];
+/** 모바일 스와이프용 길이 확보 */
+const tripled = [...items, ...items, ...items];
+
+function itemButtonClass(isActive: boolean) {
+	return `flex shrink-0 cursor-default items-baseline gap-2 border-r border-black/[0.08] px-8 transition-colors sm:px-12 snap-start ${isActive ? "text-[#0a0a0a]" : "text-neutral-400"}`;
+}
 
 export function TestimonialsSection() {
 	const [active, setActive] = useState<Item>(items[0]);
 	const [paused, setPaused] = useState(false);
+	const mobileScrollRef = useRef<HTMLDivElement>(null);
+	const scrollFrameRef = useRef<number>(0);
+
+	const syncActiveFromScroll = useCallback(() => {
+		const el = mobileScrollRef.current;
+		if (!el) return;
+		const rects = el.getBoundingClientRect();
+		const midX = rects.left + rects.width / 2;
+		const nodes = el.querySelectorAll<HTMLElement>("[data-marquee-item]");
+		let best: Item | null = null;
+		let bestDist = Infinity;
+		nodes.forEach((node) => {
+			const r = node.getBoundingClientRect();
+			const cx = r.left + r.width / 2;
+			const d = Math.abs(cx - midX);
+			if (d < bestDist) {
+				bestDist = d;
+				const idx = Number(node.dataset.index);
+				if (!Number.isNaN(idx)) best = items[idx % items.length];
+			}
+		});
+		if (best) setActive(best);
+	}, []);
+
+	useEffect(() => {
+		const el = mobileScrollRef.current;
+		if (!el) return;
+		const onScroll = () => {
+			if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+			scrollFrameRef.current = requestAnimationFrame(syncActiveFromScroll);
+		};
+		el.addEventListener("scroll", onScroll, { passive: true });
+		return () => {
+			el.removeEventListener("scroll", onScroll);
+			if (scrollFrameRef.current) cancelAnimationFrame(scrollFrameRef.current);
+		};
+	}, [syncActiveFromScroll]);
 
 	return (
 		<section className="bg-[#F8F7F2] py-14 text-[#0a0a0a] sm:py-[4.5rem] lg:py-20">
@@ -64,15 +111,15 @@ export function TestimonialsSection() {
 					</div>
 				</Reveal>
 
-				{/* 인용문 — 마키 클릭 시 교체 */}
 				<div className="mt-16 sm:mt-20 lg:mt-24">
 					<div className="border-t border-black/[0.08] pt-12 sm:pt-16">
 						<span className="welcome-serif block text-[4.5rem] leading-none text-neutral-200 sm:text-[6.3rem]">"</span>
 						<blockquote
-							key={active.quote}
-							className="welcome-serif -mt-6 max-w-3xl whitespace-pre-line text-[clamp(1.08rem,2.304vw,1.8rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#0a0a0a] transition-opacity duration-300 sm:-mt-8"
+							key={active.label}
+							className="welcome-serif -mt-6 max-w-3xl text-[clamp(1.08rem,2.304vw,1.8rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#0a0a0a] transition-opacity duration-300 sm:-mt-8"
 						>
-							{active.quote}
+							<span className="hidden whitespace-pre-line md:inline">{active.quote}</span>
+							<span className="whitespace-pre-line md:hidden">{active.quoteMobile ?? active.quote}</span>
 						</blockquote>
 						<p className="mt-6 text-[12px] font-medium uppercase tracking-[0.28em] text-neutral-400">
 							{active.meta}
@@ -81,10 +128,45 @@ export function TestimonialsSection() {
 				</div>
 			</div>
 
-			{/* 마키 — hover 시 정지, 클릭 시 인용문 교체 */}
-			<Reveal delayMs={180} className="mt-16 overflow-hidden sm:mt-20 lg:mt-24">
+			<Reveal delayMs={180} className="mt-16 sm:mt-20 lg:mt-24">
+				<p className="px-5 pb-2 text-center text-[11px] font-medium text-neutral-500 md:hidden">좌우로 스와이프해 후기를 골라 보세요.</p>
+
+				{/* 모바일: 가로 스크롤(스와이프), 가운데에 가까운 항목이 인용문에 반영 */}
+				<div className="marquee-track border-y border-black/[0.06] py-6 md:hidden">
+					<div
+						ref={mobileScrollRef}
+						className="flex w-max snap-x snap-mandatory gap-0 overflow-x-auto overscroll-x-contain touch-pan-x [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+						onTouchEnd={syncActiveFromScroll}
+					>
+						{tripled.map((item, i) => {
+							const isActive = active.label === item.label;
+							return (
+								<button
+									key={`mob-${i}-${item.label}`}
+									type="button"
+									data-marquee-item
+									data-index={items.indexOf(item)}
+									tabIndex={-1}
+									onClick={() => setActive(item)}
+									className={itemButtonClass(isActive)}
+								>
+									<span className="welcome-serif whitespace-nowrap text-[1.05rem] font-semibold tracking-tight text-[#0a0a0a] sm:text-[1.2rem]">
+										{item.label}
+									</span>
+									<span
+										className={`whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.22em] ${isActive ? "text-[#0a0a0a]" : "text-neutral-400"}`}
+									>
+										{item.sub}
+									</span>
+								</button>
+							);
+						})}
+					</div>
+				</div>
+
+				{/* 데스크톱: CSS 마퀴 + 호버 정지 */}
 				<div
-					className="marquee-track border-y border-black/[0.06] py-6"
+					className="marquee-track hidden border-y border-black/[0.06] py-6 md:block"
 					onMouseEnter={() => setPaused(true)}
 					onMouseLeave={() => setPaused(false)}
 				>
@@ -102,23 +184,14 @@ export function TestimonialsSection() {
 									aria-hidden={!isReal}
 									tabIndex={isReal ? 0 : -1}
 									onMouseEnter={() => isReal && setActive(item)}
-									className={`flex shrink-0 cursor-default items-baseline gap-2 border-r border-black/[0.08] px-8 transition-colors sm:px-12 ${
-										isActive
-											? "text-[#0a0a0a]"
-											: "text-neutral-400 hover:text-[#0a0a0a]"
-									}`}
+									onClick={() => isReal && setActive(item)}
+									className={itemButtonClass(isActive)}
 								>
-									<span
-										className={`welcome-serif whitespace-nowrap text-[1.05rem] font-semibold tracking-tight transition-colors sm:text-[1.2rem] ${
-											isActive ? "text-[#0a0a0a]" : "text-[#0a0a0a]"
-										}`}
-									>
+									<span className="welcome-serif whitespace-nowrap text-[1.05rem] font-semibold tracking-tight text-[#0a0a0a] sm:text-[1.2rem]">
 										{item.label}
 									</span>
 									<span
-										className={`whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.22em] transition-colors ${
-											isActive ? "text-[#0a0a0a]" : "text-neutral-400"
-										}`}
+										className={`whitespace-nowrap text-[11px] font-medium uppercase tracking-[0.22em] ${isActive ? "text-[#0a0a0a]" : "text-neutral-400"}`}
 									>
 										{item.sub}
 									</span>
