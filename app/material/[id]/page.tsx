@@ -203,7 +203,11 @@ function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; sum
 
 	const activeIndex = hoverIndex ?? pinnedIndex;
 
-	const handleClick = useCallback((textSlot: number) => {
+	const handleToggle = useCallback((textSlot: number, e: React.PointerEvent) => {
+		// preventDefault 로 고스트 클릭(300ms 지연 합성 click) 차단
+		e.preventDefault();
+		e.stopPropagation();
+		setHoverIndex(null);
 		setPinnedIndex((prev) => (prev === textSlot ? null : textSlot));
 	}, []);
 
@@ -277,15 +281,15 @@ function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; sum
 											: "border-zinc-200 bg-white text-zinc-900 hover:border-zinc-300 hover:shadow-sm",
 										isPinned ? "ring-2 ring-brand/30 ring-offset-1" : "",
 									].join(" ")}
-									onMouseEnter={() => setHoverIndex(textSlot)}
-									onMouseLeave={() => setHoverIndex(null)}
-									onClick={() => handleClick(textSlot)}
-									onKeyDown={(e) => {
-										if (e.key === "Enter" || e.key === " ") {
-											e.preventDefault();
-											handleClick(textSlot);
-										}
-									}}
+								onMouseEnter={() => setHoverIndex(textSlot)}
+								onMouseLeave={() => setHoverIndex(null)}
+								onPointerDown={(e) => handleToggle(textSlot, e)}
+								onKeyDown={(e) => {
+									if (e.key === "Enter" || e.key === " ") {
+										e.preventDefault();
+										setPinnedIndex((prev) => (prev === textSlot ? null : textSlot));
+									}
+								}}
 								>
 									<span className="mr-2.5 inline-block rounded-lg bg-zinc-100 px-2 py-0.5 text-xs font-bold text-zinc-500 tabular-nums">
 										{textSlot + 1}
@@ -301,17 +305,18 @@ function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; sum
 			</div>
 
 			{/* 기존과 동일한 하단 고정 해설 패널 (툴팁) */}
-			<div
-				className={[
-					"fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(32rem,94vw)] -translate-x-1/2 transition-all duration-300",
-					activeExplanation
-						? "pointer-events-auto translate-y-0 opacity-100"
-						: "pointer-events-none translate-y-4 opacity-0",
-				].join(" ")}
-				role="status"
-				aria-live="polite"
-			>
-		<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
+		<div
+			className={[
+				"fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-50 w-[min(32rem,94vw)] -translate-x-1/2 transition-all duration-300",
+				activeExplanation
+					? "pointer-events-auto translate-y-0 opacity-100"
+					: "pointer-events-none translate-y-4 opacity-0",
+			].join(" ")}
+			role="status"
+			aria-live="polite"
+			onPointerDown={(e) => e.stopPropagation()}
+		>
+			<div className="rounded-2xl bg-zinc-800 px-5 py-4 shadow-[0_8px_40px_-8px_rgba(0,0,0,0.55)]">
 				<div className="mb-2.5 flex items-center gap-2">
 					<span className="rounded-md bg-white/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-widest text-zinc-400">
 						해설
@@ -319,23 +324,29 @@ function ReadingPracticeView({ blocks, summary }: { blocks: MaterialBlock[]; sum
 					{activeIndex !== null ? (
 						<span className="text-[10px] font-bold text-zinc-500">문장 {activeIndex + 1}</span>
 					) : null}
+					{/* 모바일 전용 닫기 버튼 — onPointerDown+preventDefault 로 고스트 클릭 방지 */}
 					<button
 						type="button"
 						aria-label="해설 닫기"
-						onClick={() => { setPinnedIndex(null); setHoverIndex(null); }}
-						className="ml-auto flex h-6 w-6 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+						onPointerDown={(e) => {
+							e.preventDefault();
+							e.stopPropagation();
+							setPinnedIndex(null);
+							setHoverIndex(null);
+						}}
+						className="md:hidden ml-auto flex h-7 w-7 items-center justify-center rounded-full text-zinc-400 transition active:bg-white/10 active:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
 					>
-						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5" aria-hidden>
+						<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4" aria-hidden>
 							<path d="M3.22 3.22a.75.75 0 011.06 0L8 6.94l3.72-3.72a.75.75 0 111.06 1.06L9.06 8l3.72 3.72a.75.75 0 11-1.06 1.06L8 9.06l-3.72 3.72a.75.75 0 01-1.06-1.06L6.94 8 3.22 4.28a.75.75 0 010-1.06z" />
 						</svg>
 					</button>
 				</div>
-					<p className="whitespace-pre-wrap text-sm font-medium leading-7 tracking-tight text-white sm:text-base sm:leading-8">
-						{activeExplanation}
-					</p>
-				</div>
-				<div className="mx-auto mt-1.5 h-1 w-10 rounded-full bg-zinc-600/50" aria-hidden />
+				<p className="whitespace-pre-wrap text-sm font-medium leading-7 tracking-tight text-white sm:text-base sm:leading-8">
+					{activeExplanation}
+				</p>
 			</div>
+			<div className="mx-auto mt-1.5 h-1 w-10 rounded-full bg-zinc-600/50" aria-hidden />
+		</div>
 
 			{activeExplanation ? <div className="h-40" aria-hidden /> : null}
 
