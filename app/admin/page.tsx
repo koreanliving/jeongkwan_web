@@ -82,7 +82,6 @@ type StudentRequestItem = {
 type SignupRequestItem = {
 	id: number;
 	student_id: string;
-	password: string;
 	student_name: string;
 	academy: "서정학원" | "다올105" | "라파에듀" | "입시왕";
 	phone: string;
@@ -99,7 +98,6 @@ type SignupRequestItem = {
 type ParentSignupRequestItem = {
 	id: number;
 	username: string;
-	password: string;
 	parent_name: string;
 	phone: string;
 	student_name: string;
@@ -156,10 +154,6 @@ type ClassReportItem = {
 	updated_at: string;
 };
 
-function safeFileName(name: string) {
-	return name.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
-
 /** 이미지·혼합 블록 편집용 JSON 시작 템플릿 (text 블록 + 요약 필드) */
 function defaultMaterialJsonTemplate(): string {
 	return JSON.stringify(
@@ -181,22 +175,6 @@ function defaultMaterialJsonTemplate(): string {
 		null,
 		2,
 	);
-}
-
-function toStoragePath(fileUrl: string | null) {
-	if (!fileUrl) return null;
-	if (fileUrl.startsWith("http://") || fileUrl.startsWith("https://")) {
-		try {
-			const parsed = new URL(fileUrl);
-			const marker = "/storage/v1/object/public/materials/";
-			const idx = parsed.pathname.indexOf(marker);
-			if (idx === -1) return null;
-			return decodeURIComponent(parsed.pathname.slice(idx + marker.length));
-		} catch {
-			return null;
-		}
-	}
-	return fileUrl;
 }
 
 export default function AdminPage() {
@@ -565,36 +543,21 @@ export default function AdminPage() {
 		};
 	}, [reportGroupId]);
 
-	const uploadPdfToStorage = async (materialId: number, file: File) => {
-		const cleanedName = safeFileName(file.name);
-		const path = `${materialId}/${Date.now()}-${cleanedName}`;
-		const { error } = await supabase.storage.from("materials").upload(path, file, {
-			cacheControl: "3600",
-			upsert: false,
-			contentType: "application/pdf",
-		});
-		if (error) throw error;
-		return path;
-	};
-
-	/** 본문 JSON에 끼워 넣을 이미지 — 신규 등록 시에는 draft 폴더, 수정 시에는 자료 ID 폴더 */
 	const uploadMaterialEmbedImage = useCallback(async (file: File, materialId: number | null) => {
-		const okType =
-			file.type.startsWith("image/") ||
-			/\.(png|jpe?g|webp|gif)$/i.test(file.name);
-		if (!okType) {
-			throw new Error("이미지 파일(png, jpg, webp, gif)만 올릴 수 있습니다.");
+		const formData = new FormData();
+		formData.set("file", file);
+		if (materialId !== null) {
+			formData.set("materialId", String(materialId));
 		}
-		const cleanedName = safeFileName(file.name);
-		const folder = materialId != null ? String(materialId) : `draft-${Date.now()}`;
-		const path = `${folder}/embed/${Date.now()}-${cleanedName}`;
-		const { error } = await supabase.storage.from("materials").upload(path, file, {
-			cacheControl: "3600",
-			upsert: false,
-			contentType: file.type || "application/octet-stream",
+		const response = await fetch("/api/admin/material-assets", {
+			method: "POST",
+			body: formData,
 		});
-		if (error) throw error;
-		return path;
+		const result = (await response.json()) as { path?: string; message?: string };
+		if (!response.ok || !result.path) {
+			throw new Error(result.message ?? "이미지 업로드에 실패했습니다.");
+		}
+		return result.path;
 	}, []);
 
 	const applyMaterialJsonTemplate = useCallback(
@@ -679,37 +642,23 @@ export default function AdminPage() {
 		}
 
 		setIsCreating(true);
-	const { data: inserted, error: insertError } = await supabase
-		.from("materials")
-		.insert({
-			title: title.trim(),
-			subtitle: subtitle.trim() || null,
-			content: content.trim(),
-			category,
-			display_style: displayStyle,
-		})
-			.select("id")
-			.single();
-
-		if (insertError || !inserted) {
-			setCreateError("자료 생성에 실패했습니다.");
-			setIsCreating(false);
-			return;
-		}
-
 		try {
-			if (newFile) {
-				const filePath = await uploadPdfToStorage(inserted.id, newFile);
-				const { error: updateError } = await supabase
-					.from("materials")
-					.update({ file_url: filePath, file_name: newFile.name, file_size: newFile.size })
-					.eq("id", inserted.id);
-				if (updateError) {
-					setCreateError("자료는 생성되었지만 PDF 연결에 실패했습니다.");
-					setIsCreating(false);
-					await fetchAdminData();
-					return;
-				}
+			const formData = new FormData();
+			formData.set("title", title.trim());
+			formData.set("subtitle", subtitle.trim());
+			formData.set("content", content.trim());
+			formData.set("category", category);
+			formData.set("displayStyle", displayStyle);
+			if (newFile) formData.set("file", newFile);
+
+			const response = await fetch("/api/admin/materials", {
+				method: "POST",
+				body: formData,
+			});
+			const result = (await response.json()) as { message?: string };
+			if (!response.ok) {
+				setCreateError(result.message ?? "자료 생성에 실패했습니다.");
+				return;
 			}
 
 		setTitle("");
@@ -740,17 +689,26 @@ export default function AdminPage() {
 		setEditError("");
 		setEditNewFile(null);
 		setIsLoadingEditMaterial(true);
-		const { data, error } = await supabase
-			.from("materials")
-			.select("id, title, subtitle, content, category, display_style, file_url, file_name, file_size")
-			.eq("id", material.id)
-			.single();
+		const response = await fetch(`/api/admin/materials?id=${material.id}`, { cache: "no-store" });
+		const result = (await response.json()) as {
+			material?: {
+				title?: string | null;
+				subtitle?: string | null;
+				content?: string | null;
+				category?: string | null;
+				display_style?: string | null;
+				file_url?: string | null;
+				file_name?: string | null;
+			};
+			message?: string;
+		};
 		setIsLoadingEditMaterial(false);
-		if (error || !data) {
-			setEditError("자료 정보를 불러오지 못했습니다.");
+		if (!response.ok || !result.material) {
+			setEditError(result.message ?? "자료 정보를 불러오지 못했습니다.");
 			setEditingMaterialId(null);
 			return;
 		}
+		const data = result.material;
 		setEditTitle(data.title ?? "");
 		setEditSubtitle(data.subtitle ?? "");
 		setEditCategory((data.category as Category) || "문학");
@@ -782,45 +740,24 @@ export default function AdminPage() {
 		}
 
 		setIsSavingEdit(true);
-		const base = {
-			title: editTitle.trim(),
-			subtitle: editSubtitle.trim() || null,
-			category: editCategory,
-			content: editContent.trim(),
-			display_style: editDisplayStyle,
-		};
-
 		try {
-			if (editNewFile) {
-				const oldStoragePath = toStoragePath(editOriginalFileUrl);
-				const newPath = await uploadPdfToStorage(editingMaterialId, editNewFile);
-				const { error: updateError } = await supabase
-					.from("materials")
-					.update({
-						...base,
-						file_url: newPath,
-						file_name: editNewFile.name,
-						file_size: editNewFile.size,
-					})
-					.eq("id", editingMaterialId);
+			const formData = new FormData();
+			formData.set("id", String(editingMaterialId));
+			formData.set("title", editTitle.trim());
+			formData.set("subtitle", editSubtitle.trim());
+			formData.set("content", editContent.trim());
+			formData.set("category", editCategory);
+			formData.set("displayStyle", editDisplayStyle);
+			if (editNewFile) formData.set("file", editNewFile);
 
-				if (updateError) {
-					await supabase.storage.from("materials").remove([newPath]);
-					setEditError(updateError.message || "자료 저장에 실패했습니다.");
-					setIsSavingEdit(false);
-					return;
-				}
-
-				if (oldStoragePath && oldStoragePath !== newPath) {
-					await supabase.storage.from("materials").remove([oldStoragePath]);
-				}
-			} else {
-				const { error: updateError } = await supabase.from("materials").update(base).eq("id", editingMaterialId);
-				if (updateError) {
-					setEditError(updateError.message || "자료 저장에 실패했습니다.");
-					setIsSavingEdit(false);
-					return;
-				}
+			const response = await fetch("/api/admin/materials", {
+				method: "PATCH",
+				body: formData,
+			});
+			const result = (await response.json()) as { message?: string };
+			if (!response.ok) {
+				setEditError(result.message ?? "자료 저장에 실패했습니다.");
+				return;
 			}
 
 			closeMaterialEdit();
@@ -846,13 +783,18 @@ export default function AdminPage() {
 			return;
 		}
 		setIsCreatingVideo(true);
-		const { error } = await supabase.from("videos").insert({
-			title: videoTitle.trim(),
-			video_url: videoUrl.trim(),
-			category: videoCategory,
+		const response = await fetch("/api/admin/videos", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				title: videoTitle.trim(),
+				videoUrl: videoUrl.trim(),
+				category: videoCategory,
+			}),
 		});
-		if (error) {
-			setVideoError(error.message || "영상 등록에 실패했습니다.");
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setVideoError(result.message || "영상 등록에 실패했습니다.");
 			setIsCreatingVideo(false);
 			return;
 		}
@@ -869,13 +811,14 @@ export default function AdminPage() {
 		setDeleteError("");
 		setDeleteMessage("");
 		setIsDeletingMaterialId(material.id);
-		const storagePath = toStoragePath(material.file_url);
-		if (storagePath) {
-			await supabase.storage.from("materials").remove([storagePath]);
-		}
-		const { error } = await supabase.from("materials").delete().eq("id", material.id);
-		if (error) {
-			setDeleteError(error.message || "자료 삭제에 실패했습니다.");
+		const response = await fetch("/api/admin/materials", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: material.id }),
+		});
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setDeleteError(result.message || "자료 삭제에 실패했습니다.");
 			setIsDeletingMaterialId(null);
 			return;
 		}
@@ -889,9 +832,14 @@ export default function AdminPage() {
 		setDeleteError("");
 		setDeleteMessage("");
 		setIsDeletingVideoId(video.id);
-		const { error } = await supabase.from("videos").delete().eq("id", video.id);
-		if (error) {
-			setDeleteError(error.message || "영상 삭제에 실패했습니다.");
+		const response = await fetch("/api/admin/videos", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id: video.id }),
+		});
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setDeleteError(result.message || "영상 삭제에 실패했습니다.");
 			setIsDeletingVideoId(null);
 			return;
 		}
@@ -905,9 +853,14 @@ export default function AdminPage() {
 		setMainError("");
 		setMainMessage("");
 		setIsSavingMain(true);
-		const { error } = await supabase.from("home_settings").update({ show_post_dates: showPostDates }).eq("id", 1);
-		if (error) {
-			setMainError("표시 설정 저장에 실패했습니다.");
+		const response = await fetch("/api/admin/settings", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ showPostDates }),
+		});
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setMainError(result.message || "표시 설정 저장에 실패했습니다.");
 			setIsSavingMain(false);
 			return;
 		}
@@ -924,12 +877,17 @@ export default function AdminPage() {
 			return;
 		}
 		setIsCreatingAnnouncement(true);
-		const { error } = await supabase.from("announcements").insert({
-			title: newAnnouncementTitle.trim(),
-			content: newAnnouncementContent.trim(),
+		const response = await fetch("/api/admin/announcements", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				title: newAnnouncementTitle.trim(),
+				content: newAnnouncementContent.trim(),
+			}),
 		});
-		if (error) {
-			setAnnouncementError(error.message || "공지 등록에 실패했습니다.");
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setAnnouncementError(result.message || "공지 등록에 실패했습니다.");
 			setIsCreatingAnnouncement(false);
 			return;
 		}
@@ -948,12 +906,14 @@ export default function AdminPage() {
 			return;
 		}
 		setIsSavingAnnouncementId(id);
-		const { error } = await supabase
-			.from("announcements")
-			.update({ title: titleValue.trim(), content: contentValue.trim() })
-			.eq("id", id);
-		if (error) {
-			setAnnouncementError(error.message || "공지 수정에 실패했습니다.");
+		const response = await fetch("/api/admin/announcements", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id, title: titleValue.trim(), content: contentValue.trim() }),
+		});
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setAnnouncementError(result.message || "공지 수정에 실패했습니다.");
 			setIsSavingAnnouncementId(null);
 			return;
 		}
@@ -965,9 +925,14 @@ export default function AdminPage() {
 	const handleDeleteAnnouncement = async (id: number) => {
 		if (!window.confirm("정말 이 공지사항을 삭제할까요?")) return;
 		setIsDeletingAnnouncementId(id);
-		const { error } = await supabase.from("announcements").delete().eq("id", id);
-		if (error) {
-			setAnnouncementError(error.message || "공지 삭제에 실패했습니다.");
+		const response = await fetch("/api/admin/announcements", {
+			method: "DELETE",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ id }),
+		});
+		const result = (await response.json()) as { message?: string };
+		if (!response.ok) {
+			setAnnouncementError(result.message || "공지 삭제에 실패했습니다.");
 			setIsDeletingAnnouncementId(null);
 			return;
 		}
@@ -1455,7 +1420,6 @@ export default function AdminPage() {
 			message?: string;
 			detail?: string;
 			studentId?: string;
-			password?: string;
 		};
 
 		if (!response.ok) {
@@ -1466,7 +1430,7 @@ export default function AdminPage() {
 		}
 
 		if (action === "approve") {
-			setSignupMessage(`승인 완료: ${result.studentId} / 초기비밀번호 ${result.password}`);
+			setSignupMessage(`승인 완료: ${result.studentId}`);
 		} else {
 			setSignupMessage("가입 신청을 거절 처리했습니다.");
 		}
@@ -2433,7 +2397,7 @@ export default function AdminPage() {
 								{signupRequests.map((item) => (
 									<div key={item.id} className="rounded-xl border border-zinc-200 bg-white p-3">
 										<p className="text-sm font-semibold text-zinc-900">{item.student_name} · {item.academy}</p>
-										<p className="mt-1 text-xs text-zinc-600">아이디: <span className="font-mono">{item.student_id}</span> · 비밀번호: <span className="font-mono">{item.password}</span></p>
+										<p className="mt-1 text-xs text-zinc-600">아이디: <span className="font-mono">{item.student_id}</span></p>
 										<p className="mt-1 text-xs text-zinc-600">연락처: {item.phone} · 학년: {item.grade}</p>
 										<p className="mt-1 text-xs text-zinc-500">최근 모의고사: {item.recent_test || "-"} · 등급: {item.recent_grade || "-"}</p>
 										<p className="mt-1 text-xs text-zinc-500">선택과목: {item.selected_subject || "-"}</p>
@@ -2495,9 +2459,6 @@ export default function AdminPage() {
 											</p>
 											<p className="mt-1 text-xs text-zinc-600">
 												자녀 이름: {item.student_name} · 학원: {item.academy} · 연락처: {item.phone}
-											</p>
-											<p className="mt-1 text-xs text-zinc-600">
-												비밀번호(신청): <span className="font-mono">{item.password}</span>
 											</p>
 											<p className="mt-1 text-xs text-zinc-500">신청일: {toKoreanDate(item.created_at)}</p>
 											<div className="mt-2">

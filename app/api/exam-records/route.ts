@@ -5,7 +5,8 @@ import {
 	getExamRecordsForStudent,
 	updateExamRecord,
 } from "@/utils/examRecordsMemos";
-import { getStudentSession, isAdminRequest } from "@/utils/server/studentSession";
+import { getStudentSession } from "@/utils/server/studentSession";
+import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import type { ExamKind } from "@/utils/examKinds";
 import { isValidUuid } from "@/utils/uuidValidation";
@@ -25,7 +26,7 @@ async function assertExamRecordAccess(
 	request: NextRequest,
 	recordId: number,
 ): Promise<{ ok: true } | { ok: false; response: NextResponse }> {
-	const admin = isAdminRequest(request);
+	const admin = await isAdminRequest(request);
 	const session = await getStudentSession(request);
 	if (!admin && !session) {
 		return { ok: false, response: NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 }) };
@@ -41,7 +42,7 @@ async function assertExamRecordAccess(
 }
 
 export async function GET(request: NextRequest) {
-	const admin = isAdminRequest(request);
+	const admin = await isAdminRequest(request);
 	const session = await getStudentSession(request);
 	let studentId = parseStudentIdParam(request.nextUrl.searchParams);
 
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-	const admin = isAdminRequest(request);
+	const admin = await isAdminRequest(request);
 	const session = await getStudentSession(request);
 
 	if (!admin && !session) {

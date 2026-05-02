@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 const HERO = {
 	src: "/assets/profile.JPG",
@@ -10,13 +10,6 @@ const HERO = {
 
 export function HeroSection() {
 	const [imgFailed, setImgFailed] = useState(false);
-	const [reduceMotion, setReduceMotion] = useState(false);
-
-	useEffect(() => {
-		setReduceMotion(window.matchMedia("(prefers-reduced-motion: reduce)").matches);
-	}, []);
-
-	const photoMotion = !reduceMotion ? "md:animate-hero-ken-burns" : "";
 
 	return (
 		<section className="relative w-full overflow-hidden bg-black">
@@ -28,7 +21,7 @@ export function HeroSection() {
 							src={HERO.src}
 							alt={HERO.alt}
 							fill
-							className={`object-cover max-md:object-[62%_18%] md:object-[center_22%] ${photoMotion}`}
+							className="object-cover max-md:object-[62%_18%] md:object-[center_22%] motion-safe:md:animate-hero-ken-burns"
 							sizes="100vw"
 							priority
 							onError={() => setImgFailed(true)}

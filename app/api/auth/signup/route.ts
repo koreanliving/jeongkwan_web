@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
+import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
 
 const academies = ["서정학원", "다올105", "라파에듀", "입시왕"];
 
@@ -71,9 +72,50 @@ export async function POST(request: Request) {
 			);
 		}
 
+		const { data: created, error: createError } = await supabaseAdmin.auth.admin.createUser({
+			email: studentEmailFromUsername(studentId),
+			password,
+			email_confirm: true,
+		});
+
+		if (createError || !created.user) {
+			const message = createError?.message ?? "계정 생성에 실패했습니다.";
+			const status = message.toLowerCase().includes("already") || message.includes("already registered") ? 409 : 500;
+			return NextResponse.json(
+				{ message: status === 409 ? "이미 사용 중인 아이디입니다. 다른 아이디로 다시 시도해 주세요." : message },
+				{ status },
+			);
+		}
+
+		const userId = created.user.id;
+		const { error: profileError } = await supabaseAdmin.from("profiles").insert({
+			id: userId,
+			username: studentId,
+			name: studentName,
+			academy,
+			phone: normalizedPhone,
+			is_approved: false,
+			signup_grade: grade,
+			target_university: null,
+			target_department: null,
+		});
+
+		if (profileError) {
+			await supabaseAdmin.auth.admin.deleteUser(userId);
+			const status = profileError.code === "23505" ? 409 : 500;
+			return NextResponse.json(
+				{
+					message:
+						status === 409
+							? "이미 사용 중인 아이디입니다. 다른 아이디로 다시 시도해 주세요."
+							: "프로필 생성에 실패했습니다. 잠시 후 다시 시도해 주세요.",
+				},
+				{ status },
+			);
+		}
+
 		const { error } = await supabaseAdmin.from("signup_requests").insert({
 			student_id: studentId,
-			password,
 			student_name: studentName,
 			academy,
 			phone: normalizedPhone,
@@ -84,9 +126,11 @@ export async function POST(request: Request) {
 		});
 
 		if (error) {
+			await supabaseAdmin.from("profiles").delete().eq("id", userId);
+			await supabaseAdmin.auth.admin.deleteUser(userId);
 			if (error.code === "42703") {
 				return NextResponse.json(
-					{ message: "DB 컬럼이 최신이 아닙니다. 관리자에게 마이그레이션 실행을 요청해 주세요. (student_id, password)" },
+					{ message: "DB 컬럼이 최신이 아닙니다. 관리자에게 마이그레이션 실행을 요청해 주세요." },
 					{ status: 500 }
 				);
 			}

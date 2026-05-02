@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/utils/server/studentSession";
+import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
 
@@ -13,7 +13,7 @@ export type MaterialViewRow = {
 };
 
 export async function GET(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 

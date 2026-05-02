@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeParentUsername } from "@/utils/parentAuthEmail";
+import { hashParentPassword } from "@/utils/server/parentPassword";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
 const academies = ["서정학원", "다올105", "라파에듀", "입시왕"];
@@ -80,9 +81,11 @@ export async function POST(request: Request) {
 			);
 		}
 
+		const passwordHash = await hashParentPassword(password);
+
 		const { error } = await supabaseAdmin.from("parent_signup_requests").insert({
 			username,
-			password,
+			password: passwordHash,
 			parent_name: parentName,
 			phone: normalizedPhone,
 			student_name: studentName,

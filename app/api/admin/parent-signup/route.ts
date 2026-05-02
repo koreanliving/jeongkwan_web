@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeParentUsername } from "@/utils/parentAuthEmail";
 import { hashParentPassword } from "@/utils/server/parentPassword";
-import { isAdminRequest } from "@/utils/server/studentSession";
+import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
 
+function isBcryptHash(value: string): boolean {
+	return /^\$2[aby]\$\d{2}\$/.test(value);
+}
+
 export async function GET(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 
 	const { data, error } = await supabaseAdmin
 		.from("parent_signup_requests")
 		.select(
-			"id, username, password, parent_name, phone, student_name, academy, status, admin_note, created_at, updated_at",
+			"id, username, parent_name, phone, student_name, academy, status, admin_note, created_at, updated_at",
 		)
 		.order("created_at", { ascending: false })
 		.limit(500);
@@ -32,7 +36,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 
@@ -72,8 +76,8 @@ export async function POST(request: NextRequest) {
 			}
 
 			const username = normalizeParentUsername(String(reqRow.username ?? ""));
-			const plainPassword = String(reqRow.password ?? "").trim();
-			if (!username || !plainPassword) {
+			const storedPassword = String(reqRow.password ?? "").trim();
+			if (!username || !storedPassword) {
 				return NextResponse.json({ message: "신청 데이터가 올바르지 않습니다." }, { status: 400 });
 			}
 
@@ -99,7 +103,7 @@ export async function POST(request: NextRequest) {
 				);
 			}
 
-			const passwordHash = await hashParentPassword(plainPassword);
+			const passwordHash = isBcryptHash(storedPassword) ? storedPassword : await hashParentPassword(storedPassword);
 			const phone = String(reqRow.phone ?? "").replace(/[-\s]/g, "") || "-";
 			const parentName = String(reqRow.parent_name ?? "").trim();
 
@@ -169,7 +173,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 

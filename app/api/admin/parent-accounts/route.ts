@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAdminRequest } from "@/utils/server/studentSession";
+import { isAdminRequest } from "@/utils/server/adminSession";
 import { hashParentPassword } from "@/utils/server/parentPassword";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
 
 export async function GET(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 
@@ -94,7 +94,7 @@ export async function PATCH(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-	if (!isAdminRequest(request)) {
+	if (!(await isAdminRequest(request))) {
 		return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
 	}
 

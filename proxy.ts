@@ -1,28 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isValidUuid } from "@/utils/uuidValidation";
+import { ADMIN_AUTH_COOKIE_NAME, isAdminSessionCookieValueValid } from "@/utils/server/adminSession";
 import { PARENT_AUTH_COOKIE_NAME, PARENT_ID_COOKIE_NAME } from "@/utils/server/parentAuthConstants";
+import { isValidUuid } from "@/utils/uuidValidation";
 
 /**
- * 이 미들웨어는 `config.matcher`에 있는 경로에만 적용됩니다.
+ * `config.matcher`에 있는 경로에만 적용됩니다.
  * 로그인·가입 화면(/login, /parent-login, /auth/signup, /auth/parent-signup 등)은 matcher에 넣지 않아 누구나 접근 가능합니다.
- * API 라우트는 기본적으로 여기서 막지 않습니다.
  */
 
 const STUDENT_AUTH_COOKIE_NAME = "student_auth";
-const ADMIN_AUTH_COOKIE_NAME = "admin_auth";
 
 function isParentAppPath(pathname: string): boolean {
 	return pathname === "/parent" || pathname.startsWith("/parent/");
 }
 
-export function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
 	const pathname = request.nextUrl.pathname;
 	const studentCookie = request.cookies.get(STUDENT_AUTH_COOKIE_NAME)?.value;
 	const isStudentAuthenticated = Boolean(studentCookie && studentCookie.length > 0);
-	const isAdminAuthenticated = request.cookies.get(ADMIN_AUTH_COOKIE_NAME)?.value === "true";
+	const isAdminAuthenticated = await isAdminSessionCookieValueValid(
+		request.cookies.get(ADMIN_AUTH_COOKIE_NAME)?.value,
+	);
 
 	// 공개 랜딩(루트는 `/welcome`으로 리다이렉트하는 정적 페이지)
 	if (pathname === "/") {
+		return NextResponse.next();
+	}
+
+	if (pathname.startsWith("/api/admin/")) {
+		if (!isAdminAuthenticated) {
+			return NextResponse.json({ message: "관리자 권한이 필요합니다." }, { status: 401 });
+		}
 		return NextResponse.next();
 	}
 
@@ -69,5 +77,6 @@ export const config = {
 		"/parent",
 		"/parent/:path*",
 		"/admin/:path*",
+		"/api/admin/:path*",
 	],
 };

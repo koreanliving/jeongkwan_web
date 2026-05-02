@@ -3,7 +3,7 @@
 -- 앱은 Next.js API에서 SUPABASE_SERVICE_ROLE_KEY 로 접근합니다.
 
 -- ---------------------------------------------------------------------------
--- 1) 학부모 가입 신청 (관리자 승인 전, 비밀번호는 평문 보관 — 학생 signup_requests 와 동일 패턴)
+-- 1) 학부모 가입 신청 (관리자 승인 전, 비밀번호는 bcrypt 해시로 보관)
 -- ---------------------------------------------------------------------------
 create table if not exists public.parent_signup_requests (
   id bigserial primary key,

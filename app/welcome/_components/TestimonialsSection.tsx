@@ -215,7 +215,7 @@ export function TestimonialsSection() {
 
 				<div className="mt-16 sm:mt-20 lg:mt-24">
 					<div className="border-t border-black/[0.08] pt-12 sm:pt-16">
-						<span className="welcome-serif block text-[4.5rem] leading-none text-neutral-200 sm:text-[6.3rem]">"</span>
+						<span className="welcome-serif block text-[4.5rem] leading-none text-neutral-200 sm:text-[6.3rem]">&ldquo;</span>
 						<blockquote
 							key={active.label}
 							className="welcome-serif -mt-6 max-w-3xl text-[clamp(1.08rem,2.304vw,1.8rem)] font-normal leading-[1.2] tracking-[-0.02em] text-[#0a0a0a] transition-opacity duration-300 sm:-mt-8"

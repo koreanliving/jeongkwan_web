@@ -135,7 +135,7 @@ export default function ParentHomePage() {
 	}, [router]);
 
 	useEffect(() => {
-		void bootstrap();
+		void Promise.resolve().then(bootstrap);
 	}, [bootstrap]);
 
 	useEffect(() => {

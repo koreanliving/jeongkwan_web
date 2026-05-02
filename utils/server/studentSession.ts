@@ -38,7 +38,3 @@ export async function getStudentSession(request: NextRequest): Promise<StudentSe
 		name: profile.name as string,
 	};
 }
-
-export function isAdminRequest(request: NextRequest): boolean {
-	return request.cookies.get("admin_auth")?.value === "true";
-}
