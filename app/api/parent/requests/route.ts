@@ -9,20 +9,52 @@ function isValidType(value: string): value is RequestType {
 	return value === "보강영상" || value === "질문" || value === "상담";
 }
 
+async function getParentRequestsWithCompat(parentId: string) {
+	const withReplyColumns = await supabaseAdmin
+		.from("parent_requests")
+		.select(
+			"id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at, admin_last_response_at, requester_read_at",
+		)
+		.eq("parent_id", parentId)
+		.eq("is_deleted", false)
+		.order("created_at", { ascending: false });
+
+	if (!withReplyColumns.error) {
+		return { data: withReplyColumns.data ?? [], error: null as null };
+	}
+
+	const maybeColumnError = withReplyColumns.error as { code?: string };
+	if (maybeColumnError.code !== "42703") {
+		return { data: [] as unknown[], error: withReplyColumns.error };
+	}
+
+	const legacyColumns = await supabaseAdmin
+		.from("parent_requests")
+		.select("id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at")
+		.eq("parent_id", parentId)
+		.eq("is_deleted", false)
+		.order("created_at", { ascending: false });
+
+	if (legacyColumns.error) {
+		return { data: [] as unknown[], error: legacyColumns.error };
+	}
+
+	const compatRows = (legacyColumns.data ?? []).map((row) => ({
+		...row,
+		admin_last_response_at: null,
+		requester_read_at: null,
+	}));
+
+	return { data: compatRows, error: null as null };
+}
+
 export async function GET(request: NextRequest) {
 	const session = await getParentSession(request);
 	if (!session) {
 		return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
 	}
 
-	const { data, error } = await supabaseAdmin
-		.from("parent_requests")
-		.select(
-			"id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at, admin_last_response_at, requester_read_at",
-		)
-		.eq("parent_id", session.id)
-		.eq("is_deleted", false)
-		.order("created_at", { ascending: false });
+	const { data, error } = await getParentRequestsWithCompat(session.id);
 
 	if (error) {
 		return NextResponse.json({ message: "요청 목록을 불러오지 못했습니다." }, { status: 500 });

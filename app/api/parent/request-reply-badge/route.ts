@@ -15,15 +15,17 @@ export async function GET(_request: NextRequest) {
 		.eq("parent_id", session.id)
 		.eq("is_deleted", false);
 
-	if (error) {
+	if (error && (error as { code?: string }).code !== "42703") {
 		return NextResponse.json({ message: "확인에 실패했습니다.", detail: error.message }, { status: 500 });
 	}
 
-	const count = (data ?? []).filter((row) =>
+	const count = error
+		? 0
+		: (data ?? []).filter((row) =>
 		hasUnreadAdminReply(
 			row as { admin_last_response_at: string | null; requester_read_at: string | null },
 		),
-	).length;
+		).length;
 
 	return NextResponse.json({ count });
 }

@@ -93,19 +93,13 @@ export default function MyPage() {
 		setIsLoading(true);
 		setError("");
 
-		const reqRes = await fetch("/api/requests", { cache: "no-store" });
-		const reqData = (await reqRes.json()) as {
-			student?: {
-				id: string;
-				name: string;
-				academy?: string;
-				grade?: string | null;
-				targetUniversity?: string;
-				targetDepartment?: string;
-			};
-		};
+		const [profileRes, exRes, sumRes] = await Promise.all([
+			fetch("/api/student/profile", { cache: "no-store", credentials: "same-origin" }),
+			fetch("/api/exam-records", { cache: "no-store" }),
+			fetch("/api/student/home-summary", { cache: "no-store", credentials: "same-origin" }),
+		]);
 
-		if (!reqRes.ok || !reqData.student) {
+		if (profileRes.status === 401) {
 			setAuth("guest");
 			setStudentLabel("");
 			setStudentInfo(null);
@@ -115,23 +109,40 @@ export default function MyPage() {
 			return;
 		}
 
+		if (!profileRes.ok) {
+			setAuth("guest");
+			setError("로그인 정보를 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.");
+			setStudentLabel("");
+			setStudentInfo(null);
+			setRecords([]);
+			setHomeSummary(null);
+			setIsLoading(false);
+			return;
+		}
+
+		const profileData = (await profileRes.json()) as {
+			username?: string;
+			name?: string;
+			academy?: string;
+			signupGrade?: string | null;
+			targetUniversity?: string;
+			targetDepartment?: string;
+		};
+
 		setAuth("user");
-		setStudentLabel(`${reqData.student.name} (${reqData.student.id})`);
-		const tu = (reqData.student.targetUniversity ?? "").trim();
-		const td = (reqData.student.targetDepartment ?? "").trim();
+		const displayName = (profileData.name ?? "").trim();
+		const username = (profileData.username ?? "").trim();
+		setStudentLabel(displayName && username ? `${displayName} (${username})` : displayName || username);
+		const tu = (profileData.targetUniversity ?? "").trim();
+		const td = (profileData.targetDepartment ?? "").trim();
 		setStudentInfo({
-			academy: reqData.student.academy ?? "-",
-			grade: reqData.student.grade ?? null,
+			academy: profileData.academy ?? "-",
+			grade: profileData.signupGrade ?? null,
 			targetUniversity: tu,
 			targetDepartment: td,
 		});
 		setGoalUniv(tu);
 		setGoalDept(td);
-
-		const [exRes, sumRes] = await Promise.all([
-			fetch("/api/exam-records", { cache: "no-store" }),
-			fetch("/api/student/home-summary", { cache: "no-store", credentials: "same-origin" }),
-		]);
 		const exData = (await exRes.json()) as {
 			records?: ExamRecord[];
 			message?: string;

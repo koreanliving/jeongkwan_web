@@ -19,6 +19,7 @@ export async function GET(request: NextRequest) {
 	}
 
 	return NextResponse.json({
+		username: session.username,
 		name: ((data.name as string | null) ?? "").trim(),
 		targetUniversity: (data.target_university as string | null) ?? "",
 		targetDepartment: (data.target_department as string | null) ?? "",

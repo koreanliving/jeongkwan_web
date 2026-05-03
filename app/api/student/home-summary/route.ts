@@ -78,7 +78,7 @@ export async function GET(_request: NextRequest) {
 	if (openReqResult.error) {
 		return NextResponse.json({ message: "문의 현황을 불러오지 못했습니다.", detail: openReqResult.error.message }, { status: 500 });
 	}
-	if (unreadReqRowsResult.error) {
+	if (unreadReqRowsResult.error && (unreadReqRowsResult.error as { code?: string }).code !== "42703") {
 		return NextResponse.json({ message: "문의 알림을 불러오지 못했습니다.", detail: unreadReqRowsResult.error.message }, { status: 500 });
 	}
 	if (examCountResult.error) {
@@ -103,11 +103,13 @@ export async function GET(_request: NextRequest) {
 	const lastExamDate = lastExamRow?.exam_date?.trim() || null;
 	const tu = String((profileResult.data as { target_university?: string } | null)?.target_university ?? "").trim();
 
-	const unreadRequestReplies = (unreadReqRowsResult.data ?? []).filter((row) =>
-		hasUnreadAdminReply(
-			row as { admin_last_response_at: string | null; requester_read_at: string | null },
-		),
-	).length;
+	const unreadRequestReplies = unreadReqRowsResult.error
+		? 0
+		: (unreadReqRowsResult.data ?? []).filter((row) =>
+				hasUnreadAdminReply(
+					row as { admin_last_response_at: string | null; requester_read_at: string | null },
+				),
+			).length;
 
 	const summary: StudentHomeSummary = {
 		unreadMaterialsInRecentScan,
