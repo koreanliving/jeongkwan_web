@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
@@ -89,6 +90,10 @@ export async function POST(request: NextRequest) {
 			);
 		}
 
+		void logAdminAction(request, {
+			action: "student.create",
+			detail: { username, name, userId, isApproved },
+		});
 		return NextResponse.json({ ok: true, id: userId });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
@@ -117,6 +122,10 @@ export async function PATCH(request: NextRequest) {
 			if (error) {
 				return NextResponse.json({ message: "승인 상태 변경에 실패했습니다." }, { status: 500 });
 			}
+			void logAdminAction(request, {
+				action: "student.approve",
+				detail: { studentId: id, isApproved: body.isApproved },
+			});
 			return NextResponse.json({ ok: true });
 		}
 
@@ -129,6 +138,7 @@ export async function PATCH(request: NextRequest) {
 			if (error) {
 				return NextResponse.json({ message: error.message || "비밀번호 변경에 실패했습니다." }, { status: 500 });
 			}
+			void logAdminAction(request, { action: "student.password_reset", detail: { studentId: id } });
 			return NextResponse.json({ ok: true });
 		}
 
@@ -155,6 +165,7 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ message: error.message || "계정 삭제에 실패했습니다." }, { status: 500 });
 		}
 
+		void logAdminAction(request, { action: "student.delete", detail: { studentId: id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

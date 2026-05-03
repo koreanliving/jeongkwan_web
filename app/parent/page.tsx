@@ -34,6 +34,7 @@ type ParentRequest = {
 	admin_reply: string | null;
 	support_video_url: string | null;
 	created_at: string;
+	has_unread_reply?: boolean;
 };
 
 type ProfilePayload = {
@@ -56,6 +57,8 @@ type HomeSetting = {
 };
 
 type ParentSection = "report" | "grades" | "inquiry";
+
+const PARENT_INBOX_READ_EVENT = "parent-inbox-read";
 
 const parentNavItems: { id: ParentSection; label: string }[] = [
 	{ id: "report", label: "수업 리포트" },
@@ -83,6 +86,14 @@ export default function ParentHomePage() {
 	const [formError, setFormError] = useState("");
 	const [formMessage, setFormMessage] = useState("");
 	const [activeSection, setActiveSection] = useState<ParentSection>("report");
+	const [inquiryUnreadCount, setInquiryUnreadCount] = useState(0);
+
+	const refreshInquiryBadge = useCallback(async () => {
+		const r = await fetch("/api/parent/request-reply-badge", { cache: "no-store", credentials: "same-origin" });
+		if (!r.ok) return;
+		const j = (await r.json()) as { count?: number };
+		setInquiryUnreadCount(typeof j.count === "number" ? j.count : 0);
+	}, []);
 
 	const bootstrap = useCallback(async () => {
 		setIsBootstrapping(true);
@@ -132,11 +143,39 @@ export default function ParentHomePage() {
 		}
 
 		setIsBootstrapping(false);
-	}, [router]);
+		void refreshInquiryBadge();
+	}, [router, refreshInquiryBadge]);
 
 	useEffect(() => {
 		void Promise.resolve().then(bootstrap);
 	}, [bootstrap]);
+
+	useEffect(() => {
+		const on = () => void refreshInquiryBadge();
+		window.addEventListener(PARENT_INBOX_READ_EVENT, on);
+		return () => window.removeEventListener(PARENT_INBOX_READ_EVENT, on);
+	}, [refreshInquiryBadge]);
+
+	useEffect(() => {
+		if (activeSection !== "inquiry") return;
+		const unread = requests.filter((r) => r.has_unread_reply).map((r) => r.id);
+		if (unread.length === 0) return;
+		let cancelled = false;
+		void (async () => {
+			const res = await fetch("/api/parent/requests", {
+				method: "PATCH",
+				credentials: "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ markReadIds: unread }),
+			});
+			if (cancelled || !res.ok) return;
+			setRequests((prev) => prev.map((r) => (unread.includes(r.id) ? { ...r, has_unread_reply: false } : r)));
+			window.dispatchEvent(new Event(PARENT_INBOX_READ_EVENT));
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [activeSection, requests]);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -202,6 +241,7 @@ export default function ParentHomePage() {
 			const rqJson = (await reqRes.json()) as { requests?: ParentRequest[] };
 			setRequests(rqJson.requests ?? []);
 		}
+		void refreshInquiryBadge();
 	};
 
 	const handleDeleteRequest = async (id: number) => {
@@ -230,6 +270,7 @@ export default function ParentHomePage() {
 			const rqJson = (await reqRes.json()) as { requests?: ParentRequest[] };
 			setRequests(rqJson.requests ?? []);
 		}
+		void refreshInquiryBadge();
 	};
 
 	if (isBootstrapping || !profile) {
@@ -318,12 +359,17 @@ export default function ParentHomePage() {
 								type="button"
 								onClick={() => setActiveSection(id)}
 								aria-pressed={isActive}
-								className={`min-h-10 flex-1 touch-manipulation rounded-2xl border px-3 py-2.5 text-center text-xs font-bold tracking-tight transition sm:min-h-11 sm:flex-none sm:px-5 sm:text-sm ${
+								className={`relative min-h-10 flex-1 touch-manipulation rounded-2xl border px-3 py-2.5 text-center text-xs font-bold tracking-tight transition sm:min-h-11 sm:flex-none sm:px-5 sm:text-sm ${
 									isActive
 										? "border-brand/35 bg-brand text-white shadow-md shadow-brand/20"
 										: "comic-border border-zinc-200/90 bg-white text-zinc-700 shadow-sm hover:bg-zinc-50"
 								}`}
 							>
+								{id === "inquiry" && inquiryUnreadCount > 0 ? (
+									<span className="absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-extrabold text-white shadow">
+										{inquiryUnreadCount > 9 ? "9+" : inquiryUnreadCount}
+									</span>
+								) : null}
 								{label}
 							</button>
 						);
@@ -474,13 +520,20 @@ export default function ParentHomePage() {
 											<div className="min-w-0 flex-1">
 												<div className="flex flex-wrap items-center justify-between gap-2">
 													<p className="text-xs font-semibold text-zinc-500">{item.request_type}</p>
-													<span
-														className={`rounded-full border border-zinc-200/90 px-2 py-0.5 text-[10px] font-semibold tracking-tight ${
-															done ? "bg-white text-zinc-800" : "bg-zinc-200 text-zinc-700"
-														}`}
-													>
-														{done ? "답변완료" : "답변대기"}
-													</span>
+													<div className="flex flex-wrap items-center gap-1.5">
+														{item.has_unread_reply ? (
+															<span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+																새 답변
+															</span>
+														) : null}
+														<span
+															className={`rounded-full border border-zinc-200/90 px-2 py-0.5 text-[10px] font-semibold tracking-tight ${
+																done ? "bg-white text-zinc-800" : "bg-zinc-200 text-zinc-700"
+															}`}
+														>
+															{done ? "답변완료" : "답변대기"}
+														</span>
+													</div>
 												</div>
 												<h3 className="mt-1 text-sm font-bold text-zinc-900">{item.title}</h3>
 												<p className="mt-1 text-sm text-zinc-600">{item.content}</p>

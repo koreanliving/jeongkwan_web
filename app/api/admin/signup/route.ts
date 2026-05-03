@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
@@ -143,6 +144,10 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 상태 업데이트에 실패했습니다." }, { status: 500 });
 			}
 
+			void logAdminAction(request, {
+				action: "signup.approve",
+				detail: { requestId: body.id, studentId: username, studentName: signupData.student_name },
+			});
 			return NextResponse.json({
 				ok: true,
 				studentId: username,
@@ -161,6 +166,7 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 거절 처리에 실패했습니다." }, { status: 500 });
 			}
 
+			void logAdminAction(request, { action: "signup.reject", detail: { requestId: body.id } });
 			return NextResponse.json({ ok: true });
 		}
 
@@ -188,6 +194,7 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ message: "신청 삭제에 실패했습니다." }, { status: 500 });
 		}
 
+		void logAdminAction(request, { action: "signup.delete", detail: { requestId: body.id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

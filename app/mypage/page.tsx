@@ -3,7 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Pencil, Trash2 } from "lucide-react";
+import { Bell, Eye, FileText, Home, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import { AppTopBar } from "@/components/AppTopBar";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
@@ -12,6 +12,7 @@ import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import { supabase } from "@/utils/supabase";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import type { ExamRecord } from "@/utils/examRecordsMemos";
+import type { StudentHomeSummary } from "@/app/api/student/home-summary/route";
 import { toKoreanDate } from "@/utils/dateFormat";
 
 const DEFAULT_EXAM_KIND = EXAM_KIND_OPTIONS[0];
@@ -57,6 +58,17 @@ export default function MyPage() {
 	const [recordMutateError, setRecordMutateError] = useState("");
 	const [savingRecordId, setSavingRecordId] = useState<number | null>(null);
 	const [deletingRecordId, setDeletingRecordId] = useState<number | null>(null);
+	const [homeSummary, setHomeSummary] = useState<StudentHomeSummary | null>(null);
+
+	const refreshHomeSummary = useCallback(async () => {
+		const res = await fetch("/api/student/home-summary", { cache: "no-store", credentials: "same-origin" });
+		if (!res.ok) {
+			setHomeSummary(null);
+			return;
+		}
+		const json = (await res.json()) as { summary?: StudentHomeSummary };
+		setHomeSummary(json.summary ?? null);
+	}, []);
 
 	const loadExamRecords = useCallback(async () => {
 		setIsLoading(true);
@@ -73,7 +85,8 @@ export default function MyPage() {
 
 		setRecords(result.records ?? []);
 		setIsLoading(false);
-	}, []);
+		void refreshHomeSummary();
+	}, [refreshHomeSummary]);
 
 	const bootstrap = useCallback(async () => {
 		setAuth("unknown");
@@ -97,6 +110,7 @@ export default function MyPage() {
 			setStudentLabel("");
 			setStudentInfo(null);
 			setRecords([]);
+			setHomeSummary(null);
 			setIsLoading(false);
 			return;
 		}
@@ -114,11 +128,21 @@ export default function MyPage() {
 		setGoalUniv(tu);
 		setGoalDept(td);
 
-		const exRes = await fetch("/api/exam-records", { cache: "no-store" });
+		const [exRes, sumRes] = await Promise.all([
+			fetch("/api/exam-records", { cache: "no-store" }),
+			fetch("/api/student/home-summary", { cache: "no-store", credentials: "same-origin" }),
+		]);
 		const exData = (await exRes.json()) as {
 			records?: ExamRecord[];
 			message?: string;
 		};
+
+		if (sumRes.ok) {
+			const sumJson = (await sumRes.json()) as { summary?: StudentHomeSummary };
+			setHomeSummary(sumJson.summary ?? null);
+		} else {
+			setHomeSummary(null);
+		}
 
 		if (!exRes.ok) {
 			setError(exData.message ?? "성적을 불러오지 못했습니다.");
@@ -142,6 +166,7 @@ export default function MyPage() {
 			setStudentLabel("");
 			setStudentInfo(null);
 			setRecords([]);
+			setHomeSummary(null);
 			router.replace("/login");
 		}
 	}, [router]);
@@ -252,6 +277,7 @@ export default function MyPage() {
 				: prev,
 		);
 		setShowGoalModal(false);
+		void refreshHomeSummary();
 	};
 
 	const startEditRecord = (row: ExamRecord) => {
@@ -428,7 +454,9 @@ export default function MyPage() {
 								<dl className="flex shrink-0 gap-6 rounded-xl border border-zinc-200/90 bg-zinc-50 px-4 py-3 text-center shadow-sm sm:flex-col sm:gap-1 sm:text-left">
 									<div>
 										<dt className="text-[10px] font-extrabold tracking-tight text-zinc-500">등록 성적</dt>
-										<dd className="text-lg font-extrabold tracking-tight text-zinc-900">{records.length}건</dd>
+										<dd className="text-lg font-extrabold tracking-tight text-zinc-900">
+											{homeSummary ? homeSummary.examRecordCount : records.length}건
+										</dd>
 									</div>
 								</dl>
 							</div>
@@ -462,6 +490,61 @@ export default function MyPage() {
 								<p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{message}</p>
 							) : null}
 						</section>
+
+						{homeSummary ? (
+							<section className={`${studentComicCard} p-4 sm:p-5`}>
+								<h2 className="text-sm font-extrabold tracking-tight text-zinc-900">학습·문의 요약</h2>
+								<div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+									<Link
+										href="/material"
+										className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/30 hover:bg-white ${studentComicCard} border-zinc-200/90 bg-zinc-50/80 shadow-none`}
+									>
+										<div className="flex items-center gap-1.5 text-zinc-600">
+											<FileText className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+											<span className="text-[11px] font-semibold leading-tight">미열람 자료</span>
+										</div>
+										<p className="text-xl font-bold tabular-nums text-zinc-900">{homeSummary.unreadMaterialsInRecentScan}</p>
+										<p className="text-[10px] leading-snug text-zinc-500">최근 {homeSummary.materialsRecentScanned}개 중</p>
+									</Link>
+									<Link
+										href="/request"
+										className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/30 hover:bg-white ${studentComicCard} border-zinc-200/90 bg-zinc-50/80 shadow-none`}
+									>
+										<div className="flex items-center gap-1.5 text-zinc-600">
+											<MessageSquare className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+											<span className="text-[11px] font-semibold leading-tight">진행 중 문의</span>
+										</div>
+										<p className="text-xl font-bold tabular-nums text-zinc-900">{homeSummary.openRequestsCount}</p>
+										<p className="text-[10px] leading-snug text-zinc-500">
+											접수·처리중
+											{homeSummary.unreadRequestReplies > 0 ? ` · 새 답변 ${homeSummary.unreadRequestReplies}건` : ""}
+										</p>
+									</Link>
+									<Link
+										href="/material"
+										className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/30 hover:bg-white ${studentComicCard} border-zinc-200/90 bg-zinc-50/80 shadow-none`}
+									>
+										<div className="flex items-center gap-1.5 text-zinc-600">
+											<Eye className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+											<span className="text-[11px] font-semibold leading-tight">7일 열람</span>
+										</div>
+										<p className="text-xl font-bold tabular-nums text-zinc-900">{homeSummary.materialViewsLast7Days}</p>
+										<p className="text-[10px] leading-snug text-zinc-500">자료 열람</p>
+									</Link>
+									<Link
+										href="/student"
+										className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/30 hover:bg-white ${studentComicCard} border-zinc-200/90 bg-zinc-50/80 shadow-none`}
+									>
+										<div className="flex items-center gap-1.5 text-zinc-600">
+											<Home className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+											<span className="text-[11px] font-semibold leading-tight">학생 홈</span>
+										</div>
+										<p className="text-xl font-bold tabular-nums text-zinc-900">이동</p>
+										<p className="text-[10px] leading-snug text-zinc-500">공지·학습 요약</p>
+									</Link>
+								</div>
+							</section>
+						) : null}
 
 						<section className={`${studentComicCard} p-5 md:p-6`}>
 							<h2 className="text-base font-extrabold tracking-tight text-zinc-900">성적 추이</h2>

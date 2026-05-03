@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
@@ -74,6 +75,7 @@ export async function PATCH(request: NextRequest) {
 			admin_reply: (body.adminReply ?? "").trim() || null,
 			support_video_url: (body.supportVideoUrl ?? "").trim() || null,
 			updated_at: new Date().toISOString(),
+			admin_last_response_at: new Date().toISOString(),
 		};
 
 		const { error } = await supabaseAdmin.from("parent_requests").update(updatePayload).eq("id", body.id);
@@ -81,6 +83,10 @@ export async function PATCH(request: NextRequest) {
 			return NextResponse.json({ message: "문의 답변 저장에 실패했습니다." }, { status: 500 });
 		}
 
+		void logAdminAction(request, {
+			action: "parent_request.update",
+			detail: { requestId: body.id, status: body.status },
+		});
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
@@ -103,6 +109,7 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ message: "문의 삭제에 실패했습니다." }, { status: 500 });
 		}
 
+		void logAdminAction(request, { action: "parent_request.delete", detail: { requestId: body.id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

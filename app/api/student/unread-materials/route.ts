@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getStudentSession } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
-const MAX_RETURN = 4;
-const SCAN_LIMIT = 60;
+const MAX_RETURN = 6;
+const SCAN_LIMIT = 120;
 
 export async function GET(request: NextRequest) {
 	const session = await getStudentSession(request);

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
@@ -57,6 +58,11 @@ export async function POST(request: NextRequest) {
 			return NextResponse.json({ message: "리포트 등록에 실패했습니다.", detail: error?.message }, { status: 500 });
 		}
 
+		const report = data as { id: number; group_id: number };
+		void logAdminAction(request, {
+			action: "class_report.create",
+			detail: { reportId: report.id, groupId: report.group_id },
+		});
 		return NextResponse.json({ report: data });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
@@ -106,6 +112,11 @@ export async function PATCH(request: NextRequest) {
 			return NextResponse.json({ message: "리포트 수정에 실패했습니다.", detail: error?.message }, { status: 500 });
 		}
 
+		const report = data as { id: number; group_id: number };
+		void logAdminAction(request, {
+			action: "class_report.update",
+			detail: { reportId: report.id, groupId: report.group_id },
+		});
 		return NextResponse.json({ report: data });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
@@ -129,6 +140,7 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ message: "리포트 삭제에 실패했습니다.", detail: error.message }, { status: 500 });
 		}
 
+		void logAdminAction(request, { action: "class_report.delete", detail: { reportId: id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

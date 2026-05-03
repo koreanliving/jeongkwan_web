@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronRight, FileText, Shuffle, UserRound, X } from "lucide-react";
+import { ChevronRight, Eye, FileText, GraduationCap, MessageSquare, Shuffle, UserRound, X } from "lucide-react";
 import { supabase } from "@/utils/supabase";
 import { BottomTabNav } from "@/components/BottomTabNav";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { toKoreanDate } from "@/utils/dateFormat";
+import type { StudentHomeSummary } from "@/app/api/student/home-summary/route";
 
 type AnnouncementItem = {
 	id: number;
@@ -91,6 +92,7 @@ export default function HomePage() {
 	const [vocabShuffle, setVocabShuffle] = useState(0);
 	const [activeVocabWord, setActiveVocabWord] = useState<string | null>(null);
 	const [openAnnouncement, setOpenAnnouncement] = useState<AnnouncementItem | null>(null);
+	const [homeSummary, setHomeSummary] = useState<StudentHomeSummary | null>(null);
 
 	useEffect(() => {
 		if (!openAnnouncement) return;
@@ -108,7 +110,7 @@ export default function HomePage() {
 			setIsLoading(true);
 			setErrorMessage("");
 
-			const [announcementResult, materialResult, settingResult, profileRes, unreadRes] = await Promise.all([
+			const [announcementResult, materialResult, settingResult, profileRes, unreadRes, summaryRes] = await Promise.all([
 				supabase
 					.from("announcements")
 					.select("id, title, content, created_at")
@@ -122,10 +124,18 @@ export default function HomePage() {
 				supabase.from("home_settings").select("id, welcome_title, show_post_dates").eq("id", 1).maybeSingle(),
 				fetch("/api/student/profile", { credentials: "same-origin" }),
 				fetch("/api/student/unread-materials", { credentials: "same-origin" }),
+				fetch("/api/student/home-summary", { credentials: "same-origin", cache: "no-store" }),
 			]);
 
 			if (!isMounted) {
 				return;
+			}
+
+			if (summaryRes.ok) {
+				const summaryJson = (await summaryRes.json()) as { summary?: StudentHomeSummary };
+				setHomeSummary(summaryJson.summary ?? null);
+			} else {
+				setHomeSummary(null);
 			}
 
 			if (unreadRes.ok) {
@@ -230,6 +240,74 @@ export default function HomePage() {
 				</div>
 			</div>
 
+			{!isLoading && homeSummary ? (
+				<section className="border-b border-slate-200/80 bg-white py-3">
+					<div className={`${STUDENT_APP_SHELL}`}>
+						<h2 className="mb-2 text-sm font-bold text-slate-800">학습 요약</h2>
+						<div className="grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
+							<Link
+								href="/material"
+								className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/25 hover:bg-white ${studentComicCard} bg-slate-50/90`}
+							>
+								<div className="flex items-center gap-1.5 text-slate-600">
+									<FileText className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+									<span className="text-[11px] font-semibold leading-tight">미열람 자료</span>
+								</div>
+								<p className="text-xl font-bold tabular-nums text-slate-900">{homeSummary.unreadMaterialsInRecentScan}</p>
+								<p className="text-[10px] leading-snug text-slate-500">최근 등록 {homeSummary.materialsRecentScanned}개 중</p>
+							</Link>
+							<Link
+								href="/request"
+								className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/25 hover:bg-white ${studentComicCard} bg-slate-50/90`}
+							>
+								<div className="flex items-center gap-1.5 text-slate-600">
+									<MessageSquare className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+									<span className="text-[11px] font-semibold leading-tight">진행 중 문의</span>
+								</div>
+								<p className="text-xl font-bold tabular-nums text-slate-900">{homeSummary.openRequestsCount}</p>
+								<p className="text-[10px] leading-snug text-slate-500">
+									접수·처리중
+									{homeSummary.unreadRequestReplies > 0 ? ` · 새 답변 ${homeSummary.unreadRequestReplies}건` : ""}
+								</p>
+							</Link>
+							<Link
+								href="/material"
+								className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/25 hover:bg-white ${studentComicCard} bg-slate-50/90`}
+							>
+								<div className="flex items-center gap-1.5 text-slate-600">
+									<Eye className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+									<span className="text-[11px] font-semibold leading-tight">7일 열람</span>
+								</div>
+								<p className="text-xl font-bold tabular-nums text-slate-900">{homeSummary.materialViewsLast7Days}</p>
+								<p className="text-[10px] leading-snug text-slate-500">자료 열람 횟수</p>
+							</Link>
+							<Link
+								href="/mypage"
+								className={`flex flex-col gap-0.5 p-3 transition hover:border-brand/25 hover:bg-white ${studentComicCard} bg-slate-50/90`}
+							>
+								<div className="flex items-center gap-1.5 text-slate-600">
+									<GraduationCap className="h-3.5 w-3.5 shrink-0 text-brand" strokeWidth={2} aria-hidden />
+									<span className="text-[11px] font-semibold leading-tight">등록 성적</span>
+								</div>
+								<p className="text-xl font-bold tabular-nums text-slate-900">{homeSummary.examRecordCount}</p>
+								<p className="text-[10px] leading-snug text-slate-500">
+									{homeSummary.lastExamDate ? `최근 응시 ${toKoreanDate(homeSummary.lastExamDate)}` : "기록이 없습니다"}
+								</p>
+							</Link>
+						</div>
+						{homeSummary.needsTargetUniversity ? (
+							<Link
+								href="/mypage"
+								className="mt-2 inline-flex w-full items-center justify-center gap-1 rounded-xl border border-amber-200/80 bg-amber-50 px-3 py-2 text-center text-xs font-semibold text-amber-900 transition hover:bg-amber-100/90"
+							>
+								목표 대학·학과를 입력하면 홈 안내가 더 정확해집니다
+								<ChevronRight className="h-3.5 w-3.5 shrink-0 opacity-70" strokeWidth={2.25} aria-hidden />
+							</Link>
+						) : null}
+					</div>
+				</section>
+			) : null}
+
 			<section className="border-b border-slate-200/80 bg-white pb-4 pt-4">
 				<div className={`${STUDENT_APP_SHELL} space-y-3`}>
 					{isLoading ? <p className="text-sm text-slate-500">공지를 불러오는 중…</p> : null}
@@ -264,7 +342,10 @@ export default function HomePage() {
 			{!isLoading && unreadMaterials.length > 0 ? (
 				<div className={`${STUDENT_APP_SHELL} pt-4`}>
 					<section>
-						<h2 className="mb-2 text-sm font-bold text-slate-800">새로 확인할 자료</h2>
+						<h2 className="mb-1 text-sm font-bold text-slate-800">새로 확인할 자료 ({unreadMaterials.length})</h2>
+						<p className="mb-2 text-[11px] leading-snug text-slate-500">
+							아직 열람하지 않은 학습 자료입니다. 자료를 열람하면 목록에서 제외됩니다. 최근 등록분 위주로 표시됩니다.
+						</p>
 						<ul className="space-y-2">
 							{unreadMaterials.map((m) => (
 								<li key={m.id}>

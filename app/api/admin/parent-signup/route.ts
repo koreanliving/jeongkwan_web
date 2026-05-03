@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { normalizeParentUsername } from "@/utils/parentAuthEmail";
 import { hashParentPassword } from "@/utils/server/parentPassword";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { isValidUuid } from "@/utils/uuidValidation";
@@ -143,6 +144,10 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 상태 업데이트에 실패했습니다. 학부모 계정은 롤백되었습니다." }, { status: 500 });
 			}
 
+			void logAdminAction(request, {
+				action: "parent_signup.approve",
+				detail: { requestId: body.id, parentId, username, linkedStudentId },
+			});
 			return NextResponse.json({
 				ok: true,
 				parentId,
@@ -162,6 +167,7 @@ export async function POST(request: NextRequest) {
 				return NextResponse.json({ message: "신청 거절 처리에 실패했습니다." }, { status: 500 });
 			}
 
+			void logAdminAction(request, { action: "parent_signup.reject", detail: { requestId: body.id } });
 			return NextResponse.json({ ok: true });
 		}
 
@@ -190,6 +196,7 @@ export async function DELETE(request: NextRequest) {
 			return NextResponse.json({ message: "신청 삭제에 실패했습니다." }, { status: 500 });
 		}
 
+		void logAdminAction(request, { action: "parent_signup.delete", detail: { requestId: body.id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

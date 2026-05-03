@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { logAdminAction } from "@/utils/server/adminActionLog";
 import { isAdminRequest } from "@/utils/server/adminSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 
@@ -137,6 +138,7 @@ export async function POST(request: NextRequest) {
 				}
 			}
 
+			void logAdminAction(request, { action: "material.create", detail: { materialId } });
 			return NextResponse.json({ ok: true, id: materialId });
 		} catch (error) {
 			await supabaseAdmin.from("materials").delete().eq("id", materialId);
@@ -219,6 +221,7 @@ export async function PATCH(request: NextRequest) {
 				await supabaseAdmin.storage.from("materials").remove([existingFilePath]);
 			}
 
+			void logAdminAction(request, { action: "material.update", detail: { materialId: id } });
 			return NextResponse.json({ ok: true });
 		} catch (error) {
 			if (newFilePath) {
@@ -266,6 +269,7 @@ export async function DELETE(request: NextRequest) {
 			await supabaseAdmin.storage.from("materials").remove([storagePath]);
 		}
 
+		void logAdminAction(request, { action: "material.delete", detail: { materialId: id } });
 		return NextResponse.json({ ok: true });
 	} catch {
 		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });

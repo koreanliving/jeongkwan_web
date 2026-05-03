@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getStudentSession } from "@/utils/server/studentSession";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
+import { hasUnreadAdminReply } from "@/utils/requestReplyUnread";
 
 type RequestType = "보강영상" | "질문" | "상담";
 
@@ -16,7 +17,9 @@ export async function GET(request: NextRequest) {
 
 	const { data, error } = await supabaseAdmin
 		.from("student_requests")
-		.select("id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at")
+		.select(
+			"id, request_type, title, content, status, admin_reply, support_video_url, is_deleted, created_at, updated_at, admin_last_response_at, requester_read_at",
+		)
 		.eq("student_id", session.userId)
 		.eq("is_deleted", false)
 		.order("created_at", { ascending: false });
@@ -57,7 +60,27 @@ export async function GET(request: NextRequest) {
 			targetDepartment,
 		},
 		userId: session.userId,
-		requests: data ?? [],
+		requests: (data ?? []).map((row) => {
+			const r = row as {
+				id: number;
+				request_type: string;
+				title: string;
+				content: string;
+				status: string;
+				admin_reply: string | null;
+				support_video_url: string | null;
+				is_deleted: boolean;
+				created_at: string;
+				updated_at: string;
+				admin_last_response_at: string | null;
+				requester_read_at: string | null;
+			};
+			const { admin_last_response_at, requester_read_at, ...rest } = r;
+			return {
+				...rest,
+				has_unread_reply: hasUnreadAdminReply({ admin_last_response_at, requester_read_at }),
+			};
+		}),
 	});
 }
 
@@ -94,6 +117,43 @@ export async function POST(request: NextRequest) {
 
 		if (error) {
 			return NextResponse.json({ message: "요청 등록에 실패했습니다." }, { status: 500 });
+		}
+
+		return NextResponse.json({ ok: true });
+	} catch {
+		return NextResponse.json({ message: "요청 데이터가 올바르지 않습니다." }, { status: 400 });
+	}
+}
+
+export async function PATCH(request: NextRequest) {
+	const session = await getStudentSession(request);
+	if (!session) {
+		return NextResponse.json({ message: "로그인이 필요합니다." }, { status: 401 });
+	}
+
+	try {
+		const body = (await request.json()) as { markReadIds?: unknown };
+		const raw = body.markReadIds;
+		const ids = Array.isArray(raw)
+			? raw.map((x) => (typeof x === "number" ? x : Number(x))).filter((n) => Number.isInteger(n) && n > 0)
+			: [];
+		if (ids.length === 0) {
+			return NextResponse.json({ message: "markReadIds 배열이 필요합니다." }, { status: 400 });
+		}
+		if (ids.length > 80) {
+			return NextResponse.json({ message: "한 번에 확인 처리할 수 있는 건수를 초과했습니다." }, { status: 400 });
+		}
+
+		const now = new Date().toISOString();
+		const { error } = await supabaseAdmin
+			.from("student_requests")
+			.update({ requester_read_at: now })
+			.eq("student_id", session.userId)
+			.eq("is_deleted", false)
+			.in("id", ids);
+
+		if (error) {
+			return NextResponse.json({ message: "읽음 처리에 실패했습니다.", detail: error.message }, { status: 500 });
 		}
 
 		return NextResponse.json({ ok: true });

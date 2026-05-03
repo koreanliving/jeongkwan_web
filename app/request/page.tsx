@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { BottomTabNav } from "@/components/BottomTabNav";
+import { BottomTabNav, STUDENT_INBOX_READ_EVENT } from "@/components/BottomTabNav";
 import { AppTopBar } from "@/components/AppTopBar";
 import { STUDENT_APP_SHELL, studentComicCard } from "@/lib/appShell";
 import { toKoreanDate } from "@/utils/dateFormat";
@@ -22,6 +22,7 @@ type StudentRequest = {
 	admin_reply: string | null;
 	support_video_url: string | null;
 	created_at: string;
+	has_unread_reply?: boolean;
 };
 
 type RequestResponse = {
@@ -61,7 +62,23 @@ export default function RequestPage() {
 			return;
 		}
 
-		setRequests(result.requests ?? []);
+		const list = (result.requests ?? []) as StudentRequest[];
+		let nextList = list;
+		const unreadIds = list.filter((r) => r.has_unread_reply).map((r) => r.id);
+		if (unreadIds.length > 0) {
+			const patchRes = await fetch("/api/requests", {
+				method: "PATCH",
+				credentials: "same-origin",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({ markReadIds: unreadIds }),
+			});
+			if (patchRes.ok) {
+				nextList = list.map((r) => (unreadIds.includes(r.id) ? { ...r, has_unread_reply: false } : r));
+				window.dispatchEvent(new Event(STUDENT_INBOX_READ_EVENT));
+			}
+		}
+
+		setRequests(nextList);
 		if (result.student) {
 			setStudentLabel(`${result.student.name} (${result.student.id})`);
 		}
@@ -260,13 +277,20 @@ export default function RequestPage() {
 									<div className="min-w-0 flex-1">
 										<div className="flex flex-wrap items-center justify-between gap-2">
 											<p className="text-xs font-semibold text-zinc-500">{item.request_type}</p>
-											<span
+											<div className="flex flex-wrap items-center gap-1.5">
+												{item.has_unread_reply ? (
+													<span className="rounded-full bg-rose-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-sm">
+														새 답변
+													</span>
+												) : null}
+												<span
 												className={`rounded-full border border-zinc-200/90 px-2 py-0.5 text-[10px] font-semibold tracking-tight ${
 													done ? "bg-white text-zinc-800" : "bg-zinc-200 text-zinc-700"
 												}`}
 											>
 												{done ? "답변완료" : "답변대기"}
-											</span>
+												</span>
+											</div>
 										</div>
 										<h3 className="mt-1 text-sm font-bold text-zinc-900">{item.title}</h3>
 										<p className="mt-1 text-sm text-zinc-600">{item.content}</p>

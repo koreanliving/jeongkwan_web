@@ -6,6 +6,10 @@ import { CheckCircle2, Circle, ClipboardList, ImagePlus, MessageSquareText, Penc
 import { ExamScoreFormFields } from "@/components/ExamScoreFormFields";
 import { ExamTrendChartLazy } from "@/components/ExamTrendChartLazy";
 import type { ExamRecord, Memo } from "@/utils/examRecordsMemos";
+import type { AdminActionLogRow } from "@/app/api/admin/action-logs/route";
+import type { AdminDashboardSummary } from "@/app/api/admin/dashboard-summary/route";
+import type { StudentActivityItem } from "@/app/api/admin/student-activity/route";
+import type { MaterialReadStatItem, MaterialReadStatsResponse } from "@/app/api/admin/material-read-stats/route";
 import type { MaterialViewRow } from "@/app/api/admin/student-material-views/route";
 import { EXAM_KIND_OPTIONS, EXAM_KIND_OTHER, normalizeExamKindForForm } from "@/utils/examKinds";
 import { supabase } from "../../utils/supabase";
@@ -18,7 +22,7 @@ import { getYoutubeEmbedUrl } from "@/lib/youtube";
 import { toKoreanDate } from "@/utils/dateFormat";
 
 type Category = "문학" | "비문학";
-type AdminTab = "materials" | "videos" | "main" | "members" | "groups" | "requests";
+type AdminTab = "materials" | "videos" | "main" | "members" | "groups" | "requests" | "logs";
 
 type MaterialItem = {
 	id: number;
@@ -186,6 +190,9 @@ export default function AdminPage() {
 
 	const [listError, setListError] = useState("");
 
+	const [dashboardSummary, setDashboardSummary] = useState<AdminDashboardSummary | null>(null);
+	const [dashboardSummaryError, setDashboardSummaryError] = useState("");
+
 	const [title, setTitle] = useState("");
 	const [subtitle, setSubtitle] = useState("");
 	const [category, setCategory] = useState<Category>("문학");
@@ -302,12 +309,21 @@ export default function AdminPage() {
 	const [editReportContent, setEditReportContent] = useState("");
 	const [savingReportId, setSavingReportId] = useState<number | null>(null);
 
+	const [actionLogs, setActionLogs] = useState<AdminActionLogRow[]>([]);
+	const [actionLogsError, setActionLogsError] = useState("");
+	const [actionLogsLoading, setActionLogsLoading] = useState(false);
+
 	const [studentDetailModal, setStudentDetailModal] = useState<StudentItem | null>(null);
 	const [detailExamRecords, setDetailExamRecords] = useState<ExamRecord[]>([]);
 	const [detailMemos, setDetailMemos] = useState<Memo[]>([]);
 	const [detailMaterialViews, setDetailMaterialViews] = useState<MaterialViewRow[]>([]);
 	const [detailMaterialViewsError, setDetailMaterialViewsError] = useState("");
 	const [detailMaterialViewsFilter, setDetailMaterialViewsFilter] = useState<"전체" | "문학" | "비문학">("전체");
+	const [materialReadStatsById, setMaterialReadStatsById] = useState<Record<number, MaterialReadStatItem>>({});
+	const [materialReadStatsApprovedCount, setMaterialReadStatsApprovedCount] = useState<number | null>(null);
+	const [materialReadStatsError, setMaterialReadStatsError] = useState("");
+	const [detailActivity, setDetailActivity] = useState<StudentActivityItem[]>([]);
+	const [detailActivityError, setDetailActivityError] = useState("");
 	const [detailLoading, setDetailLoading] = useState(false);
 	const [detailExamError, setDetailExamError] = useState("");
 	const [detailMemoError, setDetailMemoError] = useState("");
@@ -341,6 +357,36 @@ export default function AdminPage() {
 	const parsedPreview = useMemo(() => parseMaterialContent(content), [content]);
 	const previewTextBlocks = parsedPreview.blocks.filter((b) => b.type === "text").length;
 	const previewImageBlocks = parsedPreview.blocks.filter((b) => b.type === "image").length;
+
+	const detailMaterialViewsFilteredStats = useMemo(() => {
+		const filtered = detailMaterialViews.filter(
+			(m) => detailMaterialViewsFilter === "전체" || m.category === detailMaterialViewsFilter,
+		);
+		const viewed = filtered.filter((m) => m.viewed).length;
+		const total = filtered.length;
+		const pct = total > 0 ? Math.round((viewed / total) * 100) : 0;
+		return { viewed, total, pct, unread: total - viewed };
+	}, [detailMaterialViews, detailMaterialViewsFilter]);
+
+	const fetchMaterialReadStats = useCallback(async () => {
+		setMaterialReadStatsError("");
+		const res = await fetch("/api/admin/material-read-stats", { cache: "no-store" });
+		const json = (await res.json()) as MaterialReadStatsResponse & { message?: string; detail?: string };
+		if (!res.ok) {
+			setMaterialReadStatsById({});
+			setMaterialReadStatsApprovedCount(null);
+			setMaterialReadStatsError(
+				json.detail ? `${json.message ?? "열람 통계를 불러오지 못했습니다."} (${json.detail})` : (json.message ?? "열람 통계를 불러오지 못했습니다."),
+			);
+			return;
+		}
+		const next: Record<number, MaterialReadStatItem> = {};
+		for (const it of json.items ?? []) {
+			next[it.materialId] = it;
+		}
+		setMaterialReadStatsById(next);
+		setMaterialReadStatsApprovedCount(json.approvedStudentCount ?? 0);
+	}, []);
 
 	const resolveParentLink = useCallback(
 		(item: ParentSignupRequestItem): string => {
@@ -467,6 +513,24 @@ export default function AdminPage() {
 			setParentAccountsError("");
 			setParentAccounts(parentAccountsResult.accounts ?? []);
 		}
+
+		const summaryRes = await fetch("/api/admin/dashboard-summary", { cache: "no-store" });
+		const summaryJson = (await summaryRes.json()) as {
+			summary?: AdminDashboardSummary;
+			message?: string;
+			detail?: string;
+		};
+		if (!summaryRes.ok) {
+			setDashboardSummary(null);
+			setDashboardSummaryError(
+				summaryJson.detail
+					? `${summaryJson.message ?? "요약을 불러오지 못했습니다."} (${summaryJson.detail})`
+					: (summaryJson.message ?? "요약을 불러오지 못했습니다."),
+			);
+		} else {
+			setDashboardSummaryError("");
+			setDashboardSummary(summaryJson.summary ?? null);
+		}
 	}, []);
 
 	const fetchAdminData = useCallback(async () => {
@@ -492,6 +556,9 @@ export default function AdminPage() {
 			setMaterials([]);
 			setVideos([]);
 			setAnnouncements([]);
+			setMaterialReadStatsById({});
+			setMaterialReadStatsApprovedCount(null);
+			setMaterialReadStatsError("");
 			return;
 		}
 
@@ -503,8 +570,8 @@ export default function AdminPage() {
 		setMaterials((materialResult.data ?? []) as MaterialItem[]);
 		setVideos((videoResult.data ?? []) as VideoItem[]);
 		setAnnouncements((announcementResult.data ?? []) as AnnouncementItem[]);
-		await fetchManagementData();
-	}, [fetchManagementData]);
+		await Promise.all([fetchManagementData(), fetchMaterialReadStats()]);
+	}, [fetchManagementData, fetchMaterialReadStats]);
 
 	useEffect(() => {
 		void fetchAdminData();
@@ -542,6 +609,28 @@ export default function AdminPage() {
 			cancelled = true;
 		};
 	}, [reportGroupId]);
+
+	const loadActionLogs = useCallback(async () => {
+		setActionLogsLoading(true);
+		setActionLogsError("");
+		const res = await fetch("/api/admin/action-logs?limit=120", { cache: "no-store" });
+		const json = (await res.json()) as { items?: AdminActionLogRow[]; message?: string; detail?: string };
+		setActionLogsLoading(false);
+		if (!res.ok) {
+			setActionLogs([]);
+			setActionLogsError(
+				json.detail ? `${json.message ?? "작업 로그를 불러오지 못했습니다."} (${json.detail})` : (json.message ?? "작업 로그를 불러오지 못했습니다."),
+			);
+			return;
+		}
+		setActionLogsError("");
+		setActionLogs(json.items ?? []);
+	}, []);
+
+	useEffect(() => {
+		if (activeTab !== "logs") return;
+		void loadActionLogs();
+	}, [activeTab, loadActionLogs]);
 
 	const uploadMaterialEmbedImage = useCallback(async (file: File, materialId: number | null) => {
 		const formData = new FormData();
@@ -1065,6 +1154,22 @@ export default function AdminPage() {
 		setDetailExamMutateError("");
 		setDetailSavingExamId(null);
 		setDetailDeletingExamId(null);
+		setDetailActivity([]);
+		setDetailActivityError("");
+	};
+
+	const refreshStudentDetailActivity = async (userId: string) => {
+		const res = await fetch(`/api/admin/student-activity?studentId=${encodeURIComponent(userId)}`, { cache: "no-store" });
+		const json = (await res.json()) as { items?: StudentActivityItem[]; message?: string; detail?: string };
+		if (!res.ok) {
+			setDetailActivity([]);
+			setDetailActivityError(
+				json.detail ? `${json.message ?? "활동 기록을 불러오지 못했습니다."} (${json.detail})` : (json.message ?? "활동 기록을 불러오지 못했습니다."),
+			);
+		} else {
+			setDetailActivityError("");
+			setDetailActivity(json.items ?? []);
+		}
 	};
 
 	const openStudentDetailModal = async (student: StudentItem) => {
@@ -1098,16 +1203,20 @@ export default function AdminPage() {
 		setDetailMaterialViews([]);
 		setDetailMaterialViewsError("");
 		setDetailMaterialViewsFilter("전체");
+		setDetailActivity([]);
+		setDetailActivityError("");
 
 		const sid = encodeURIComponent(student.id);
-		const [exRes, memRes, mvRes] = await Promise.all([
+		const [exRes, memRes, mvRes, actRes] = await Promise.all([
 			fetch(`/api/exam-records?studentId=${sid}`, { cache: "no-store" }),
 			fetch(`/api/memos?studentId=${sid}`, { cache: "no-store" }),
 			fetch(`/api/admin/student-material-views?studentId=${sid}`, { cache: "no-store" }),
+			fetch(`/api/admin/student-activity?studentId=${sid}`, { cache: "no-store" }),
 		]);
 		const exJson = (await exRes.json()) as { records?: ExamRecord[]; message?: string };
 		const memJson = (await memRes.json()) as { memos?: Memo[]; message?: string };
 		const mvJson = (await mvRes.json()) as { items?: MaterialViewRow[]; message?: string };
+		const actJson = (await actRes.json()) as { items?: StudentActivityItem[]; message?: string; detail?: string };
 
 		setDetailLoading(false);
 
@@ -1130,6 +1239,16 @@ export default function AdminPage() {
 			setDetailMaterialViews([]);
 		} else {
 			setDetailMaterialViews(mvJson.items ?? []);
+		}
+
+		if (!actRes.ok) {
+			setDetailActivity([]);
+			setDetailActivityError(
+				actJson.detail ? `${actJson.message ?? "활동 기록을 불러오지 못했습니다."} (${actJson.detail})` : (actJson.message ?? "활동 기록을 불러오지 못했습니다."),
+			);
+		} else {
+			setDetailActivityError("");
+			setDetailActivity(actJson.items ?? []);
 		}
 	};
 
@@ -1166,6 +1285,7 @@ export default function AdminPage() {
 		if (memRes.ok) {
 			setDetailMemos(memJson.memos ?? []);
 			setDetailMemoError("");
+			void refreshStudentDetailActivity(studentDetailModal.id);
 		}
 	};
 
@@ -1234,6 +1354,7 @@ export default function AdminPage() {
 		if (exRes.ok) {
 			setDetailExamRecords(exJson.records ?? []);
 			setDetailExamError("");
+			void refreshStudentDetailActivity(modal.id);
 		}
 	};
 
@@ -1350,6 +1471,7 @@ export default function AdminPage() {
 		if (memRes.ok) {
 			setDetailMemos(memJson.memos ?? []);
 			setDetailMemoError("");
+			void refreshStudentDetailActivity(studentDetailModal.id);
 		}
 	};
 
@@ -1901,7 +2023,7 @@ export default function AdminPage() {
 						<Link href="/material" className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-sm font-medium text-zinc-700 transition hover:bg-zinc-50">자료실로</Link>
 					</div>
 
-					<div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-zinc-200/70 p-1.5 sm:grid-cols-3 lg:grid-cols-6">
+					<div className="mt-4 grid grid-cols-2 gap-2 rounded-2xl bg-zinc-200/70 p-1.5 sm:grid-cols-3 lg:grid-cols-4">
 						{[
 							{ key: "materials", label: "자료 업로드" },
 							{ key: "videos", label: "영상 업로드" },
@@ -1909,6 +2031,7 @@ export default function AdminPage() {
 							{ key: "members", label: "회원관리" },
 							{ key: "groups", label: "수업반" },
 							{ key: "requests", label: "요청관리" },
+							{ key: "logs", label: "작업 로그" },
 						].map((tab) => (
 							<button
 								key={tab.key}
@@ -1921,6 +2044,112 @@ export default function AdminPage() {
 						))}
 					</div>
 				</header>
+
+				{dashboardSummaryError ? (
+					<p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{dashboardSummaryError}</p>
+				) : null}
+
+				{dashboardSummary ? (
+					<section
+						className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]"
+						aria-label="운영 요약"
+					>
+						<h2 className="text-sm font-semibold text-zinc-500">운영 요약</h2>
+						<p className="mt-1 text-xs text-zinc-500">숫자를 누르면 해당 탭으로 이동합니다. 최근 7일 지표는 참고용입니다.</p>
+						<div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+							<button
+								type="button"
+								onClick={() => setActiveTab("members")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.pendingStudentSignups > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">학생 가입 대기</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.pendingStudentSignups}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("members")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.pendingParentSignups > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">학부모 가입 대기</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.pendingParentSignups}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("requests")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.openStudentRequests > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">학생 요청 (접수·처리중)</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.openStudentRequests}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("requests")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.openParentRequests > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">학부모 문의 (접수·처리중)</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.openParentRequests}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("members")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.unapprovedStudents > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">미승인 학생 계정</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.unapprovedStudents}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("members")}
+								className={`rounded-2xl border px-3 py-3 text-left transition hover:bg-zinc-50 ${
+									dashboardSummary.unapprovedParentAccounts > 0 ? "border-amber-200 bg-amber-50/70" : "border-zinc-200 bg-zinc-50/80"
+								}`}
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">미승인 학부모 계정</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.unapprovedParentAccounts}</p>
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("materials")}
+								className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-3 py-3 text-left transition hover:bg-zinc-50"
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">등록 자료</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.materialsCount}</p>
+								{dashboardSummary.latestMaterialCreatedAt ? (
+									<p className="mt-1 text-[10px] text-zinc-500">최신 {toKoreanDate(dashboardSummary.latestMaterialCreatedAt)}</p>
+								) : null}
+							</button>
+							<button
+								type="button"
+								onClick={() => setActiveTab("videos")}
+								className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-3 py-3 text-left transition hover:bg-zinc-50"
+							>
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">등록 영상</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.videosCount}</p>
+								{dashboardSummary.latestVideoCreatedAt ? (
+									<p className="mt-1 text-[10px] text-zinc-500">최신 {toKoreanDate(dashboardSummary.latestVideoCreatedAt)}</p>
+								) : null}
+							</button>
+							<div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-3 py-3">
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">자료 열람 (7일)</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.materialViewsLast7Days}</p>
+							</div>
+							<div className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-3 py-3">
+								<p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500">성적 기록 건수 (7일)</p>
+								<p className="mt-1 text-2xl font-bold tabular-nums text-zinc-900">{dashboardSummary.examRecordsCreatedLast7Days}</p>
+							</div>
+						</div>
+					</section>
+				) : null}
 
 				{activeTab === "materials" ? (
 					<>
@@ -2054,14 +2283,28 @@ export default function AdminPage() {
 
 						<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
 							<h2 className="text-lg font-semibold text-zinc-900">자료 목록</h2>
+							{materialReadStatsApprovedCount !== null && !materialReadStatsError ? (
+								<p className="mt-1 text-xs text-zinc-500">승인 학생 {materialReadStatsApprovedCount}명 기준 열람·미열람·열람률입니다.</p>
+							) : null}
+							{materialReadStatsError ? <p className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">{materialReadStatsError}</p> : null}
 							{deleteError ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{deleteError}</p> : null}
 							{deleteMessage ? <p className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{deleteMessage}</p> : null}
 							<div className="mt-3 max-h-96 space-y-2 overflow-y-auto">
-								{materials.map((material) => (
+								{materials.map((material) => {
+									const stat = materialReadStatsById[material.id];
+									return (
 									<div key={material.id} className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
 										<p className="text-sm font-medium text-zinc-800">#{material.id} {material.title}</p>
 										<p className="mt-0.5 text-xs text-zinc-500">{material.subtitle || "부제 없음"}</p>
 										<p className="mt-0.5 text-xs text-zinc-500">{material.category} · {toKoreanDate(material.created_at)}{material.file_name ? ` · ${material.file_name}` : ""}</p>
+										{stat ? (
+											<p className="mt-1.5 text-xs font-medium text-zinc-700 tabular-nums">
+												열람 {stat.viewedStudentCount}명 · 미열람 {stat.unreadStudentCount}명 · 열람률 {stat.readRatePercent}%
+												{stat.lastViewedAt ? ` · 최근 ${toKoreanDate(stat.lastViewedAt)}` : ""}
+											</p>
+										) : !materialReadStatsError && materialReadStatsApprovedCount === null ? (
+											<p className="mt-1.5 text-xs text-zinc-400">열람 통계를 불러오는 중…</p>
+										) : null}
 										<div className="mt-2 flex flex-wrap gap-2">
 											<button type="button" onClick={() => void openMaterialEdit(material)} disabled={editingMaterialId !== null} className="inline-flex min-h-9 items-center gap-1 rounded-lg border border-zinc-300 px-2.5 text-xs font-semibold text-zinc-700 transition hover:bg-zinc-100 disabled:cursor-not-allowed disabled:opacity-60">
 												<Pencil className="h-3.5 w-3.5" />자료 수정
@@ -2071,7 +2314,8 @@ export default function AdminPage() {
 											</button>
 										</div>
 									</div>
-								))}
+									);
+								})}
 							</div>
 						</section>
 
@@ -2915,6 +3159,56 @@ export default function AdminPage() {
 				</section>
 			) : null}
 
+			{activeTab === "logs" ? (
+				<section className="rounded-3xl border border-zinc-200 bg-white p-5 shadow-[0_14px_35px_-20px_rgba(0,0,0,0.35)]">
+					<div className="flex flex-wrap items-center justify-between gap-3">
+						<div className="flex items-center gap-2">
+							<ClipboardList className="h-5 w-5 text-zinc-700" aria-hidden />
+							<div>
+								<h2 className="text-lg font-semibold text-zinc-900">관리자 작업 로그</h2>
+								<p className="mt-0.5 text-xs text-zinc-500">
+									회원·자료·요청·가입 신청·수업 리포트 등 주요 조작을 기록합니다. DB에{" "}
+									<code className="rounded bg-zinc-100 px-1 text-[11px]">admin_action_logs</code> 테이블을 만든 뒤 조회됩니다.
+								</p>
+							</div>
+						</div>
+						<button
+							type="button"
+							onClick={() => void loadActionLogs()}
+							disabled={actionLogsLoading}
+							className="inline-flex min-h-10 items-center rounded-xl border border-zinc-300 bg-white px-3 text-sm font-semibold text-zinc-800 transition hover:bg-zinc-50 disabled:opacity-50"
+						>
+							{actionLogsLoading ? "불러오는 중…" : "새로고침"}
+						</button>
+					</div>
+					{actionLogsError ? (
+						<p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-800">{actionLogsError}</p>
+					) : null}
+					{!actionLogsLoading && !actionLogsError && actionLogs.length === 0 ? (
+						<p className="mt-4 text-sm text-zinc-500">기록이 없거나 테이블이 아직 없을 수 있습니다.</p>
+					) : null}
+					<ul className="mt-4 max-h-[min(70vh,32rem)] space-y-3 overflow-y-auto">
+						{actionLogs.map((row) => (
+							<li key={row.id} className="rounded-2xl border border-zinc-200 bg-zinc-50/80 px-3 py-3">
+								<div className="flex flex-wrap items-baseline justify-between gap-2">
+									<p className="font-mono text-sm font-semibold text-zinc-900">{row.action}</p>
+									<time className="text-xs tabular-nums text-zinc-500" dateTime={row.created_at}>
+										{toKoreanDate(row.created_at)}
+									</time>
+								</div>
+								<p className="mt-1 text-[11px] text-zinc-500">
+									{row.ip ? `IP ${row.ip}` : "IP —"}
+									{row.user_agent ? ` · ${row.user_agent.slice(0, 80)}${row.user_agent.length > 80 ? "…" : ""}` : ""}
+								</p>
+								<pre className="mt-2 max-h-28 overflow-auto rounded-lg bg-zinc-900/90 p-2 text-[10px] leading-snug text-zinc-100">
+									{row.detail ? JSON.stringify(row.detail, null, 2) : "—"}
+								</pre>
+							</li>
+						))}
+					</ul>
+				</section>
+			) : null}
+
 				{studentDetailModal !== null ? (
 					<div
 						className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
@@ -2981,6 +3275,27 @@ export default function AdminPage() {
 										</dd>
 									</div>
 								</dl>
+							</section>
+
+							<section className="mt-4 rounded-2xl border border-zinc-200 bg-zinc-50 p-3">
+								<h3 className="text-xs font-semibold text-zinc-500">최근 활동</h3>
+								<p className="mt-0.5 text-[11px] text-zinc-500">자료 열람·성적·요청·관리자 메모를 시간순으로 묶어 최대 25건까지 표시합니다.</p>
+								{detailActivityError ? <p className="mt-2 text-sm text-rose-600">{detailActivityError}</p> : null}
+								{!detailLoading && !detailActivityError && detailActivity.length === 0 ? (
+									<p className="mt-2 text-sm text-zinc-500">표시할 활동이 없습니다.</p>
+								) : null}
+								<ul className="mt-2 max-h-52 space-y-2 overflow-y-auto">
+									{detailActivity.map((item, idx) => (
+										<li
+											key={`${item.kind}-${item.at}-${idx}`}
+											className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm"
+										>
+											<p className="font-medium text-zinc-900">{item.label}</p>
+											{item.meta ? <p className="mt-0.5 text-xs text-zinc-600">{item.meta}</p> : null}
+											<p className="mt-1 text-[10px] text-zinc-400">{toKoreanDate(item.at)}</p>
+										</li>
+									))}
+								</ul>
 							</section>
 
 							<section className="mt-4 border-t border-zinc-100 pt-4">
@@ -3190,6 +3505,12 @@ export default function AdminPage() {
 									</button>
 								))}
 							</div>
+							{!detailLoading && detailMaterialViews.length > 0 ? (
+								<p className="mt-2 text-xs text-zinc-600 tabular-nums">
+									이 학생 · {detailMaterialViewsFilter === "전체" ? "전체 자료" : `${detailMaterialViewsFilter}만`}: 열람 {detailMaterialViewsFilteredStats.viewed}/{detailMaterialViewsFilteredStats.total} ({detailMaterialViewsFilteredStats.pct}%), 미열람{" "}
+									{detailMaterialViewsFilteredStats.unread}개
+								</p>
+							) : null}
 							{detailMaterialViewsError ? (
 								<p className="mt-2 rounded-lg border border-rose-100 bg-rose-50 px-2 py-1.5 text-sm text-rose-700">{detailMaterialViewsError}</p>
 							) : null}
