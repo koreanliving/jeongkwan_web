@@ -47,8 +47,24 @@ export default function MaterialPage() {
 	const [materials, setMaterials] = useState<MaterialItem[]>([]);
 	const [isLoading, setIsLoading] = useState(true);
 	const [errorMessage, setErrorMessage] = useState("");
-	const [isAdminUi] = useState(() => (typeof document !== "undefined" ? document.cookie.includes("admin_ui=true") : false));
+	const [isAdminUi, setIsAdminUi] = useState(false);
 	const [showPostDates, setShowPostDates] = useState(true);
+
+	useEffect(() => {
+		let isMounted = true;
+
+		const checkAdminUi = async () => {
+			const response = await fetch("/api/auth/admin-status", { credentials: "same-origin", cache: "no-store" });
+			if (!isMounted || !response.ok) return;
+			const result = (await response.json()) as { isAdmin?: boolean };
+			setIsAdminUi(result.isAdmin === true);
+		};
+
+		void checkAdminUi();
+		return () => {
+			isMounted = false;
+		};
+	}, []);
 
 	useEffect(() => {
 		let isMounted = true;

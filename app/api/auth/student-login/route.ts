@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { studentEmailFromUsername } from "@/utils/studentAuthEmail";
 import { supabaseAdmin } from "@/utils/server/supabaseAdmin";
 import { createSupabaseAuthWithCookieCapture } from "@/utils/server/supabaseAuthCookies";
+import { clearAdminAuthCookies } from "@/utils/server/adminSession";
 
 const STUDENT_AUTH_COOKIE_NAME = "student_auth";
 
@@ -64,6 +65,7 @@ export async function POST(request: NextRequest) {
 		const ok = NextResponse.json({ ok: true });
 		applyCookies(ok);
 		ok.cookies.set(STUDENT_AUTH_COOKIE_NAME, "true", studentGateCookieOptions);
+		clearAdminAuthCookies(ok);
 		return ok;
 	} catch {
 		return NextResponse.json({ message: "요청 처리 중 오류가 발생했습니다." }, { status: 400 });
